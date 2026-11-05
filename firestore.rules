@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() {
+      return request.auth != null;
+    }
+    function valido(d) {
+      return d.keys().hasOnly([
+        "nome", "estabelecimento", "categoria", "quantidade", "unidade",
+        "cidade", "descricao", "validade", "preco", "precoAntigo",
+        "precoReferencia", "precoUnidade", "imagemChave", "status",
+        "demonstracao", "criadoPor", "criadoEm", "atualizadoEm"
+      ])
+      && d.keys().hasAll([
+        "nome", "estabelecimento", "categoria", "quantidade", "unidade",
+        "cidade", "descricao", "validade", "preco", "precoAntigo",
+        "precoReferencia", "precoUnidade", "imagemChave", "status",
+        "demonstracao", "criadoPor", "criadoEm"
+      ])
+      && d.nome is string && d.nome.size() >= 3 && d.nome.size() <= 100
+      && d.estabelecimento is string && d.estabelecimento.size() >= 1 && d.estabelecimento.size() <= 100
+      && d.categoria in ["Hortifruti", "Padarias", "Refeições", "Bebidas", "Mercearia", "Outros"]
+      && d.quantidade is number && d.quantidade > 0 && d.quantidade <= 10000
+      && d.unidade in ["unidades", "kg", "cestas", "pacotes", "litros"]
+      && d.cidade is string && d.cidade.size() >= 1 && d.cidade.size() <= 100
+      && d.descricao is string && d.descricao.size() <= 300
+      && d.validade is string && d.validade.size() <= 10
+      && d.preco is string && d.preco.size() <= 30
+      && d.precoAntigo is string && d.precoAntigo.size() <= 30
+      && (d.precoReferencia == null || (d.precoReferencia is number && d.precoReferencia >= 0))
+      && d.precoUnidade is string && d.precoUnidade.size() <= 40
+      && d.imagemChave is string && d.imagemChave.size() <= 30
+      && d.status == "disponivel"
+      && d.demonstracao is bool
+      && d.criadoPor == request.auth.uid
+      && d.criadoEm is timestamp && d.criadoEm == request.time;
+    }
+    match /alimentos/{alimentoId} {
+      allow read: if logado();
+      allow create: if logado() && valido(request.resource.data);
+      // Só permite atualizar os campos de preço em exemplos próprios.
+      allow update: if logado()
+        && resource.data.demonstracao == true
+        && resource.data.criadoPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "precoReferencia", "precoUnidade", "atualizadoEm"
+        ])
+        && request.resource.data.precoReferencia is number
+        && request.resource.data.precoReferencia >= 0
+        && request.resource.data.precoUnidade is string
+        && request.resource.data.precoUnidade.size() <= 40
+        && request.resource.data.atualizadoEm == request.time;
+      allow delete: if logado() && resource.data.criadoPor == request.auth.uid;
+    }
+  }
+}

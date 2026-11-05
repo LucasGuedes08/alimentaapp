@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Alimenta+",
+    "slug": "alimenta-mais",
+    "scheme": "alimentamais",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.alimentamais.tcc"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFCF6",
+          "image": "./assets/images/tabIcons/logo.png",
+          "imageWidth": 220
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1d6bf758-56e9-443b-a679-ed2a0d75d892"
+      }
+    }
+  }
+}
