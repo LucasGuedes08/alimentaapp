@@ -1,9 +1,9 @@
-
 import React from "react";
 
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -25,26 +25,30 @@ const FUNDO = "#FFFCF6";
 
 const CONQUISTAS = [
   {
-    nome: "Sua primeira contribuição!",
-    icone: "basket-outline",
+    nome: "Sua primeira doação!",
+    imagem: require("../assets/images/conquistas/image 145.png"),
   },
   {
-    nome: "Você cadastrou 5 doações",
-    icone: "cube-outline",
+    nome: "Você realizou 5 doações",
+    imagem: require("../assets/images/conquistas/image 146.png"),
   },
   {
-    nome: "Você cadastrou 15 doações",
-    icone: "people-outline",
+    nome: "Você realizou 15 doações",
+    imagem: require("../assets/images/conquistas/image 144.png"),
   },
   {
-    nome: "Você cadastrou 30 doações",
-    icone: "ribbon-outline",
+    nome: "Você realizou 30 doações",
+    icone: "ribbon",
+    cor: "#D39A35",
   },
   {
-    nome: "Você cadastrou 50 doações",
-    icone: "trophy-outline",
+    nome: "Você realizou 50 doações",
+    icone: "trophy",
+    cor: "#D39A35",
   },
 ];
+
+const IMAGEM_BLOQUEADA = require("../assets/images/conquistas/image 148.png");
 
 export default function TelaConquistas({
   navigation,
@@ -52,7 +56,7 @@ export default function TelaConquistas({
   const { width } = useWindowDimensions();
 
   const largura = Math.min(width, 460);
-  const larguraCard = (largura - 56) / 3;
+  const larguraCard = (largura - 58) / 3;
 
   const {
     doacoes,
@@ -173,24 +177,32 @@ export default function TelaConquistas({
                     styles.card,
                     {
                       width: larguraCard,
-                      minHeight: larguraCard + 45,
+                      minHeight: larguraCard + 34,
                     },
                   ]}
                 >
                   <View style={styles.iconeFundo}>
-                    <Ionicons
-                      name={
-                        desbloqueada
-                          ? item.icone
-                          : "lock-closed"
-                      }
-                      size={38}
-                      color={
-                        desbloqueada
-                          ? VERDE
-                          : "#6C6679"
-                      }
-                    />
+                    {desbloqueada ? (
+                      item.imagem ? (
+                        <Image
+                          source={item.imagem}
+                          style={styles.iconeImagem}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Ionicons
+                          name={item.icone}
+                          size={38}
+                          color={item.cor}
+                        />
+                      )
+                    ) : (
+                      <Image
+                        source={IMAGEM_BLOQUEADA}
+                        style={styles.iconeImagem}
+                        resizeMode="contain"
+                      />
+                    )}
                   </View>
 
                   <Text style={styles.cardTexto}>
@@ -211,12 +223,6 @@ export default function TelaConquistas({
             })}
           </View>
 
-          <Text style={styles.nota}>
-            As conquistas são calculadas pelas
-            doações cadastradas na sua conta,
-            sem contar os exemplos fictícios.
-            Não confirmam entrega ou retirada.
-          </Text>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -237,19 +243,19 @@ const styles = StyleSheet.create({
 
   conteudo: {
     padding: 19,
-    paddingBottom: 125,
+    paddingBottom: 30,
   },
 
   topo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingRight: 56,
+    paddingRight: 0,
   },
 
   voltar: {
-    width: 39,
-    height: 39,
+    width: 34,
+    height: 34,
     borderRadius: 20,
     backgroundColor: "#E6F0DF",
     alignItems: "center",
@@ -278,31 +284,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     alignItems: "center",
-    marginTop: 20,
-    paddingVertical: 15,
+    marginTop: 17,
+    paddingVertical: 11,
     elevation: 3,
   },
 
   resumoTitulo: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#242424",
     fontFamily: "Poppins_500Medium",
   },
 
   resumoTotal: {
-    fontSize: 19,
+    fontSize: 18,
     color: VERDE,
     fontFamily: "Poppins_700Bold",
     marginTop: 3,
   },
 
   trilho: {
-    height: 15,
-    width: 134,
+    height: 10,
+    width: 98,
     backgroundColor: "#DADADA",
     borderRadius: 10,
     overflow: "hidden",
-    marginTop: 6,
+    marginTop: 5,
   },
 
   preenchido: {
@@ -312,33 +318,34 @@ const styles = StyleSheet.create({
   },
 
   secao: {
-    fontSize: 19,
+    fontSize: 18,
     fontFamily: "Poppins_700Bold",
     color: VERDE,
-    marginTop: 23,
+    marginTop: 20,
     marginLeft: 5,
   },
 
   descricao: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#777777",
     marginLeft: 5,
-    marginBottom: 19,
+    marginBottom: 13,
     fontFamily: "Poppins_400Regular",
   },
 
   grade: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 14,
+    justifyContent: "flex-start",
+    columnGap: 10,
+    rowGap: 10,
   },
 
   card: {
     backgroundColor: "#F4FAF1",
     borderColor: "#CDD5CB",
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 11,
     padding: 7,
     alignItems: "center",
     justifyContent: "center",
@@ -346,14 +353,19 @@ const styles = StyleSheet.create({
   },
 
   iconeFundo: {
-    minHeight: 50,
+    minHeight: 52,
     justifyContent: "center",
     alignItems: "center",
   },
 
+  iconeImagem: {
+    width: 56,
+    height: 52,
+  },
+
   cardTexto: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 10,
+    lineHeight: 14,
     textAlign: "center",
     color: "#535B53",
     fontFamily: "Poppins_400Regular",
@@ -372,15 +384,7 @@ const styles = StyleSheet.create({
   data: {
     fontSize: 11,
     color: VERDE,
-    fontFamily: "Poppins_500Medium",
-  },
-
-  nota: {
-    marginTop: 22,
-    fontSize: 11,
-    lineHeight: 18,
-    color: "#727A71",
-    textAlign: "center",
+    fontFamily: "Poppins_500Medium"
   },
 
   erro: {
@@ -388,4 +392,4 @@ const styles = StyleSheet.create({
     color: "#BD3333",
     marginVertical: 15,
   },
-});
+})

@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from "react";
 
 import {
@@ -377,4 +376,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: VERDE,
   },
-});
+})

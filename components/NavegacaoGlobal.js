@@ -1,4 +1,3 @@
-
 import React, {
   useEffect,
   useState,
@@ -66,14 +65,9 @@ const ABAS = [
     icone: "home-outline",
   },
   {
-    id: "buscar",
-    nome: "Buscar",
-    icone: "search-outline",
-  },
-  {
     id: "eventos",
     nome: "Eventos",
-    icone: "calendar-outline",
+    icone: "map-outline",
   },
   {
     id: "doar",
@@ -164,6 +158,15 @@ export default function NavegacaoGlobal({
       ? abaAtiva
       : "inicio";
 
+  if (
+    rotaAtual === "TelaDetalhesProduto" ||
+    rotaAtual === "TelaConquistas" ||
+    rotaAtual === "DetalhesCobranca" ||
+    rotaAtual === "TelaSeuPedido"
+  ) {
+    return null;
+  }
+
   return (
     <>
       <View
@@ -194,6 +197,7 @@ export default function NavegacaoGlobal({
               styles.barraInferior,
               {
                 paddingBottom: insets.bottom,
+                minHeight: 46 + insets.bottom,
               },
             ]}
           >
@@ -207,23 +211,17 @@ export default function NavegacaoGlobal({
               >
                 <Ionicons
                   name={aba.icone}
-                  size={22}
-                  color={
-                    abaSelecionada === aba.id
-                      ? VERDE
-                      : "#656565"
-                  }
+                  size={23}
+                  color="#111111"
                 />
 
                 <Text
                   numberOfLines={1}
-                  style={[
-                    styles.textoAba,
-                    abaSelecionada === aba.id &&
-                      styles.textoAbaAtiva,
-                  ]}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={styles.textoAba}
                 >
-                  {aba.nome}
+                  {aba.id === "inicio" ? "Início" : aba.nome}
                 </Text>
               </Pressable>
             ))}
@@ -364,30 +362,25 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: FUNDO,
-    borderTopWidth: 1,
-    borderTopColor: "#D9DFD6",
+    borderWidth: 1,
+    borderColor: "#B7B7B7",
     flexDirection: "row",
-    paddingTop: 7,
-    minHeight: 60,
+    minHeight: 46,
   },
 
   aba: {
     flex: 1,
     minWidth: 0,
-    minHeight: 52,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 1,
   },
 
   textoAba: {
-    fontSize: 10,
-    color: "#656565",
-  },
-
-  textoAbaAtiva: {
-    color: VERDE,
-    fontWeight: "700",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 12,
+    color: "#111111",
   },
 
   fundoModal: {
@@ -474,4 +467,4 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: "#6B746B",
   },
-});
+})

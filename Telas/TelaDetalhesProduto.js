@@ -1,9 +1,8 @@
-
 import React, { useEffect, useState } from "react";
 
 import {
   View,
-  Text,
+  Text as TextoNativo,
   Image,
   ScrollView,
   TouchableOpacity,
@@ -14,13 +13,46 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { getDownloadURL, getStorage, ref } from "firebase/storage";
 import { doc, onSnapshot } from "firebase/firestore";
+import { IMAGENS_CATALOGO } from "../assets/images/catalogo/mapa";
+import {
+  calcularPrecoPromocional,
+  obterPrecoAtual,
+  obterPrecoOriginal,
+} from "../utils/precosProdutos";
+import { adicionarProdutoAoCarrinho } from "../utils/carrinhoDoacoes";
 
+import { app } from "../firebase";
 import { db } from "../firebaseDb";
-import MenuInferior from "../components/MenuInferior";
 
 const VERDE = "#006838";
 const FUNDO = "#FFFCF6";
+const storage = getStorage(app);
+
+function Text({ style, ...props }) {
+  const estiloOriginal = StyleSheet.flatten(style) || {};
+  const pesoFonte = String(estiloOriginal.fontWeight || "400");
+  const estiloSemPeso = { ...estiloOriginal };
+  delete estiloSemPeso.fontWeight;
+
+  const familiaFonte =
+    estiloOriginal.fontFamily ||
+    (pesoFonte === "500"
+      ? "Poppins_500Medium"
+      : pesoFonte === "600"
+      ? "Poppins_600SemiBold"
+      : ["700", "800", "bold"].includes(pesoFonte)
+      ? "Poppins_700Bold"
+      : "Poppins_400Regular");
+
+  return (
+    <TextoNativo
+      {...props}
+      style={[estiloSemPeso, { fontFamily: familiaFonte }]}
+    />
+  );
+}
 
 const IMAGENS = {
   cesta: require("../assets/images/tabIcons/cesta-basica.png"),
@@ -38,6 +70,7 @@ const IMAGENS = {
   tomate: require("../assets/images/tabIcons/tomate.png"),
   cenoura: require("../assets/images/tabIcons/cenoura.png"),
   alface: require("../assets/images/tabIcons/alface.png"),
+  ...IMAGENS_CATALOGO,
 };
 
 function normalizar(valor) {
@@ -48,6 +81,74 @@ function normalizar(valor) {
 }
 
 function imagemProduto(produto) {
+  const camposImagem = [
+    "imagemUrl",
+    "imageUrl",
+    "fotoUrl",
+    "fotoURL",
+    "photoUrl",
+    "photoURL",
+    "urlImagem",
+    "urlFoto",
+    "imagem",
+    "foto",
+    "image",
+  ];
+
+  let imagemRemota;
+
+  for (const campo of camposImagem) {
+    const valor = produto?.[campo];
+
+    if (typeof valor === "string" && valor.trim()) {
+      imagemRemota = valor.trim();
+      break;
+    }
+
+    if (valor && typeof valor === "object") {
+      const url =
+        valor.uri ||
+        valor.url ||
+        valor.downloadURL ||
+        valor.downloadUrl ||
+        valor.fullPath ||
+        valor.path;
+
+      if (typeof url === "string" && url.trim()) {
+        imagemRemota = url.trim();
+        break;
+      }
+    }
+  }
+
+  if (
+    typeof imagemRemota === "string" &&
+    /^(https?:\/\/|data:image\/|file:\/\/|content:\/\/)/i.test(
+      imagemRemota.trim()
+    )
+  ) {
+    return { tipo: "remota", valor: imagemRemota };
+  }
+
+  if (typeof imagemRemota === "string" && IMAGENS[imagemRemota]) {
+    return { tipo: "local", valor: IMAGENS[imagemRemota] };
+  }
+
+  if (IMAGENS[produto?.imagemChave]) {
+    return {
+      tipo: "local",
+      valor: IMAGENS[produto.imagemChave],
+    };
+  }
+
+  if (typeof imagemRemota === "string") {
+    return { tipo: "storage", valor: imagemRemota };
+  }
+
+  return null;
+}
+
+function imagemLocalPorNome(produto) {
   if (IMAGENS[produto?.imagemChave]) {
     return IMAGENS[produto.imagemChave];
   }
@@ -55,7 +156,10 @@ function imagemProduto(produto) {
   const nome = normalizar(produto?.nome);
 
   for (const chave of Object.keys(IMAGENS)) {
-    if (nome.includes(chave)) {
+    if (nome && (
+      nome.includes(chave.replace(/-/g, " ")) ||
+      normalizar(chave).includes(nome)
+    )) {
       return IMAGENS[chave];
     }
   }
@@ -108,6 +212,10 @@ export default function TelaDetalhesProduto({
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [quantidade, setQuantidade] = useState(1);
+  const [imagemStorage, setImagemStorage] = useState(null);
+  const [imagemFalhou, setImagemFalhou] = useState(false);
+  const [adicionandoCarrinho, setAdicionandoCarrinho] = useState(false);
+  const [avisoCarrinho, setAvisoCarrinho] = useState("");
 
   useEffect(() => {
     if (!produtoId) {
@@ -152,37 +260,126 @@ export default function TelaDetalhesProduto({
     return parar;
   }, [produtoId]);
 
-  const preco =
-    moeda(produto?.precoReferencia) ||
-    moeda(produto?.precoAntigo) ||
-    moeda(produto?.preco) ||
-    moeda(route.params?.precoReferencia);
-  const unidadePreco =
-    produto?.precoUnidade ||
-    route.params?.precoUnidade ||
-    produto?.unidade ||
-    "unidade";
+  const precoOriginal =
+    obterPrecoOriginal(produto) ??
+    route.params?.precoAntigo ??
+    route.params?.precoReferencia;
+  const precoAtual =
+    obterPrecoAtual(produto) ??
+    (route.params?.precoAtual ??
+      (produto?.demonstracao === true
+        ? calcularPrecoPromocional(precoOriginal)
+        : null));
+  const precoAtualFormatado = moeda(precoAtual);
+  const precoOriginalFormatado = moeda(precoOriginal);
 
-  const maximo = Math.max(
-    1,
-    Math.floor(Number(produto?.quantidade) || 1)
+  const estoque = Math.max(
+    0,
+    Math.floor(Number(produto?.quantidade) || 0)
   );
+
+  const imagemProdutoAtual = imagemProduto(produto);
+  const imagemFallback = imagemLocalPorNome(produto);
+  const caminhoImagemStorage =
+    imagemProdutoAtual?.tipo === "storage"
+      ? imagemProdutoAtual.valor
+      : null;
+
+  useEffect(() => {
+    let ativo = true;
+    setImagemStorage(null);
+
+    if (!caminhoImagemStorage) {
+      return () => {
+        ativo = false;
+      };
+    }
+
+    getDownloadURL(ref(storage, caminhoImagemStorage))
+      .then((uri) => {
+        if (ativo) {
+          setImagemStorage({ uri });
+        }
+      })
+      .catch((erroImagem) => {
+        console.warn(
+          "Não foi possível carregar a imagem do produto:",
+          erroImagem?.code || erroImagem?.message
+        );
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [caminhoImagemStorage]);
+
+  useEffect(() => {
+    setImagemFalhou(false);
+  }, [produto?.id, imagemProdutoAtual?.valor]);
+
+  useEffect(() => {
+    setQuantidade((atual) =>
+      estoque === 0
+        ? 0
+        : Math.min(Math.max(1, atual), estoque)
+    );
+  }, [estoque]);
 
   const alterarQuantidade = (passo) => {
     setQuantidade((atual) =>
-      Math.max(
-        1,
-        Math.min(maximo, atual + passo)
-      )
+      estoque === 0
+        ? 0
+        : Math.min(estoque, Math.max(1, atual + passo))
     );
   };
 
-  const imagem = imagemProduto(produto);
+  async function adicionarAoCarrinho() {
+    if (!produto || estoque === 0 || quantidade < 1) return;
+
+    setAdicionandoCarrinho(true);
+    setAvisoCarrinho("");
+
+    try {
+      const armazenamento = await adicionarProdutoAoCarrinho(
+        produto.id,
+        quantidade,
+        undefined,
+        {
+          ...produto,
+          precoAtual,
+          preco: precoAtual,
+          disponibilidade: estoque,
+        }
+      );
+      setAvisoCarrinho(
+        armazenamento === "local"
+          ? "Alimento salvo neste dispositivo. Para sincronizar, atualize as regras do Firestore."
+          : "Alimento adicionado ao carrinho."
+      );
+    } catch (erroAdicao) {
+      console.error("Erro ao adicionar alimento ao carrinho:", erroAdicao);
+      setAvisoCarrinho(
+        erroAdicao.message || "Não foi possível adicionar ao carrinho."
+      );
+    } finally {
+      setAdicionandoCarrinho(false);
+    }
+  }
+
+  const imagemCadastrada =
+    imagemProdutoAtual?.tipo === "remota"
+      ? { uri: imagemProdutoAtual.valor }
+      : imagemProdutoAtual?.tipo === "local"
+      ? imagemProdutoAtual.valor
+      : imagemStorage;
+  const imagem = imagemFalhou
+    ? imagemFallback
+    : imagemCadastrada || imagemFallback;
 
   return (
     <SafeAreaView
       style={styles.safe}
-      edges={["top", "bottom"]}
+      edges={["bottom"]}
     >
       <View style={[styles.painel, { width: largura }]}>
         <ScrollView
@@ -191,12 +388,18 @@ export default function TelaDetalhesProduto({
           showsVerticalScrollIndicator={false}
         >
           {/* IMAGEM PRINCIPAL */}
-          <View style={styles.hero}>
+          <View
+            style={[
+              styles.hero,
+              { height: Math.max(210, Math.min(280, largura * 0.68)) },
+            ]}
+          >
             {imagem ? (
               <Image
                 source={imagem}
-                resizeMode="contain"
+                resizeMode="cover"
                 style={styles.imagemHero}
+                onError={() => setImagemFalhou(true)}
               />
             ) : (
               <Ionicons
@@ -215,6 +418,15 @@ export default function TelaDetalhesProduto({
                 color={VERDE}
                 size={23}
               />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.abrirCarrinho}
+              onPress={() => navigation.navigate("TelaCarrinhoDoacoes")}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir carrinho de doações"
+            >
+              <Ionicons name="cart-outline" color={VERDE} size={20} />
             </TouchableOpacity>
           </View>
 
@@ -251,11 +463,23 @@ export default function TelaDetalhesProduto({
                     "Doador não informado"}
                 </Text>
 
-                {!!preco && (
-                  <Text style={styles.preco}>
-                    Varejo: {preco} / {unidadePreco}
-                  </Text>
-                )}
+                <View style={styles.linhaPreco}>
+                  {precoAtualFormatado ? (
+                    <Text style={styles.preco}>
+                      {precoAtualFormatado}
+                    </Text>
+                  ) : (
+                    <Text style={styles.preco}>
+                      Doação gratuita
+                    </Text>
+                  )}
+
+                  {!!precoAtualFormatado && !!precoOriginalFormatado && (
+                    <Text style={styles.precoReferencia}>
+                      De {precoOriginalFormatado}
+                    </Text>
+                  )}
+                </View>
 
                 <View style={styles.local}>
                   <Text style={styles.localTexto}>
@@ -268,7 +492,7 @@ export default function TelaDetalhesProduto({
               </View>
 
               {/* DESCRIÇÃO */}
-              <Text style={styles.secao}>
+              <Text style={[styles.secao, styles.secaoSobre]}>
                 Sobre o produto
               </Text>
 
@@ -278,59 +502,81 @@ export default function TelaDetalhesProduto({
               </Text>
 
               {/* QUANTIDADE */}
-              <Text style={styles.secao}>
-                Quantidade
-              </Text>
+              <View style={styles.cabecalhoQuantidade}>
+                <Text style={styles.secao}>Quantidade</Text>
 
-              <View style={styles.contador}>
-                <TouchableOpacity
-                  style={styles.contadorBotao}
-                  onPress={() =>
-                    alterarQuantidade(-1)
-                  }
-                  accessibilityLabel="Diminuir quantidade"
-                >
-                  <Ionicons
-                    name="remove"
-                    size={18}
-                    color="#333"
-                  />
-                </TouchableOpacity>
-
-                <Text style={styles.contadorNumero}>
-                  {quantidade}
+                <Text style={styles.disponivel}>
+                  Disponível: {estoque} {produto.unidade || "unidades"}
                 </Text>
-
-                <TouchableOpacity
-                  style={styles.contadorBotao}
-                  onPress={() =>
-                    alterarQuantidade(1)
-                  }
-                  accessibilityLabel="Aumentar quantidade"
-                >
-                  <Ionicons
-                    name="add"
-                    size={18}
-                    color="#333"
-                  />
-                </TouchableOpacity>
               </View>
 
-              <Text style={styles.disponivel}>
-                Disponível: {produto.quantidade || "—"}{" "}
-                {produto.unidade || "unidades"}
-              </Text>
+              <View style={styles.linhaAcoes}>
+                <View style={styles.contador}>
+                  <TouchableOpacity
+                    style={[
+                      styles.contadorBotao,
+                      quantidade <= 1 && styles.botaoContadorInativo,
+                    ]}
+                    onPress={() => alterarQuantidade(-1)}
+                    disabled={estoque === 0 || quantidade <= 1}
+                    accessibilityLabel="Diminuir quantidade"
+                  >
+                    <Ionicons
+                      name="remove"
+                      size={18}
+                      color="#333"
+                    />
+                  </TouchableOpacity>
 
-              <Text style={styles.aviso}>
-                {produto.demonstracao
-                  ? "Este alimento é um exemplo fictício do TCC e não está disponível para retirada."
-                  : "A seleção de quantidade é apenas demonstrativa. A reserva precisa ser implementada e validada no Firestore antes de ser liberada."}
-              </Text>
+                  <Text style={styles.contadorNumero}>
+                    {quantidade}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.contadorBotao,
+                      quantidade >= estoque &&
+                        styles.botaoContadorInativo,
+                    ]}
+                    onPress={() => alterarQuantidade(1)}
+                    disabled={estoque === 0 || quantidade >= estoque}
+                    accessibilityLabel="Aumentar quantidade"
+                  >
+                    <Ionicons
+                      name="add"
+                      size={18}
+                      color="#333"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.botaoDoe,
+                    (estoque === 0 || adicionandoCarrinho) &&
+                      styles.botaoDoeInativo,
+                  ]}
+                  onPress={adicionarAoCarrinho}
+                  disabled={estoque === 0 || adicionandoCarrinho}
+                  accessibilityRole="button"
+                >
+                  {adicionandoCarrinho ? (
+                    <ActivityIndicator size="small" color={VERDE} />
+                  ) : (
+                    <Text style={styles.botaoDoeTexto}>
+                      {estoque === 0
+                        ? "Sem estoque"
+                        : "Adicionar ao carrinho de doações"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {!!avisoCarrinho && (
+                <Text style={styles.avisoCarrinho}>{avisoCarrinho}</Text>
+              )}
             </>
           )}
         </ScrollView>
-
-        <MenuInferior navigation={navigation} />
       </View>
     </SafeAreaView>
   );
@@ -351,40 +597,51 @@ const styles = StyleSheet.create({
 
   conteudo: {
     flexGrow: 1,
-    paddingBottom: 28,
+    paddingBottom: 30,
   },
 
   hero: {
-    height: 225,
-    backgroundColor: "#EFEDE6",
+    backgroundColor: "#E6D8C8",
     justifyContent: "center",
     alignItems: "center",
   },
 
   imagemHero: {
     width: "100%",
-    height: "96%",
+    height: "100%",
   },
 
   voltar: {
     position: "absolute",
-    left: 16,
-    top: 15,
-    width: 38,
-    height: 38,
-    borderRadius: 22,
-    backgroundColor: "#E5F1DC",
+    left: 12,
+    top: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 18,
+    backgroundColor: "#E9F6E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  abrirCarrinho: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#E9F6E2",
     alignItems: "center",
     justifyContent: "center",
   },
 
   cardProduto: {
     backgroundColor: "#FFFFFF",
-    marginHorizontal: 18,
-    marginTop: -22,
-    borderRadius: 17,
-    paddingTop: 16,
-    paddingHorizontal: 18,
+    marginHorizontal: 24,
+    marginTop: -8,
+    borderRadius: 14,
+    paddingTop: 12,
+    paddingHorizontal: 11,
     paddingBottom: 0,
     borderWidth: 1,
     borderColor: "#DEDEDE",
@@ -400,81 +657,112 @@ const styles = StyleSheet.create({
 
   categoriaPill: {
     alignSelf: "flex-start",
-    backgroundColor: "#C5E1B8",
-    paddingHorizontal: 17,
-    paddingVertical: 6,
+    backgroundColor: "#BBD9AC",
+    paddingHorizontal: 16,
+    paddingVertical: 5,
     borderRadius: 20,
   },
 
   categoriaTexto: {
     color: "#356F39",
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
+    textTransform: "uppercase",
   },
 
   nomeProduto: {
-    fontSize: 19,
-    fontWeight: "800",
-    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 7,
     color: "#181818",
   },
 
   estabelecimento: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#777",
-    marginTop: 3,
+    marginTop: 2,
+    fontStyle: "italic",
+  },
+
+  linhaPreco: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 9,
   },
 
   preco: {
-    color: VERDE,
-    fontSize: 20,
-    fontWeight: "800",
-    marginTop: 10,
-    marginBottom: 12,
+    color: "#248349",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  precoReferencia: {
+    color: "#777777",
+    fontSize: 13,
+    textDecorationLine: "line-through",
   },
 
   local: {
-    marginHorizontal: -18,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
+    marginHorizontal: -11,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
   },
 
   localTexto: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#575757",
+    fontWeight: "600",
   },
 
   secao: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 15,
+    fontWeight: "700",
     color: "#191919",
-    marginHorizontal: 22,
-    marginTop: 18,
+    marginTop: 0,
+  },
+
+  secaoSobre: {
+    marginHorizontal: 30,
+    marginTop: 14,
   },
 
   descricao: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 19,
     color: "#717171",
-    marginHorizontal: 22,
+    marginHorizontal: 30,
     marginTop: 7,
+  },
+
+  cabecalhoQuantidade: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginHorizontal: 30,
+    marginTop: 18,
   },
 
   contador: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    width: 140,
-    height: 44,
+    width: "52%",
+    maxWidth: 150,
+    height: 38,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#DDDDDD",
-    borderRadius: 11,
-    marginLeft: 22,
-    marginTop: 9,
+    borderRadius: 12,
     paddingHorizontal: 10,
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   contadorBotao: {
@@ -488,23 +776,58 @@ const styles = StyleSheet.create({
 
   contadorNumero: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#222",
   },
 
-  disponivel: {
-    marginLeft: 22,
-    marginTop: 8,
-    fontSize: 11,
-    color: VERDE,
+  botaoContadorInativo: {
+    opacity: 0.5,
   },
 
-  aviso: {
-    marginHorizontal: 22,
-    marginTop: 15,
+  disponivel: {
+    fontSize: 10,
+    color: "#647264",
+  },
+
+  linhaAcoes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 30,
+    marginTop: 6,
+  },
+
+  botaoDoe: {
+    flex: 1,
+    minHeight: 38,
+    minWidth: 100,
+    borderRadius: 20,
+    backgroundColor: "#E7F5D8",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    elevation: 2,
+  },
+
+  botaoDoeInativo: {
+    backgroundColor: "#E2E2E2",
+    elevation: 0,
+  },
+
+  botaoDoeTexto: {
+    color: VERDE,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  avisoCarrinho: {
+    marginHorizontal: 30,
+    marginTop: 7,
+    color: VERDE,
     fontSize: 11,
-    lineHeight: 17,
-    color: "#887348",
+    fontWeight: "500",
   },
 
   erro: {
@@ -513,4 +836,4 @@ const styles = StyleSheet.create({
     color: "#B3261E",
     fontSize: 13,
   },
-});
+})

@@ -1,4 +1,3 @@
-
 import React, {
   useCallback,
   useState,
@@ -63,17 +62,17 @@ const OPCOES = [
   {
     nome: "Notificações",
     icone: "notifications-outline",
-    destino: "notificacoes",
+    destino: "TelaNotificacoes",
   },
   {
     nome: "Ajuda e suporte",
     icone: "help-circle-outline",
-    destino: "ajuda",
+    destino: "TelaAjudaSuporte",
   },
   {
     nome: "Sobre o Alimenta+",
     icone: "information-circle-outline",
-    destino: "sobre",
+    destino: "TelaSobreAlimenta",
   },
   {
     nome: "Sair da conta",
@@ -166,25 +165,6 @@ export default function TelaPerfil({ navigation }) {
       return;
     }
 
-    // NOTIFICAÇÕES
-    if (destino === "notificacoes") {
-      setModal("notificacoes");
-      return;
-    }
-
-    // AJUDA
-    if (destino === "ajuda") {
-      setModal("ajuda");
-      return;
-    }
-
-    // SOBRE
-    if (destino === "sobre") {
-      setModal("sobre");
-      return;
-    }
-
-    // ABRIR OUTRAS TELAS
     navigation.navigate(destino);
   }
 
@@ -224,43 +204,12 @@ export default function TelaPerfil({ navigation }) {
   // CONTEÚDO DO MODAL
   // ======================================
 
-  function conteudoModal() {
-    if (modal === "sair") {
-      return {
-        titulo: "Sair da conta?",
-        descricao:
-          "Tem certeza de que deseja sair do Alimenta+? Seus dados e suas doações continuarão salvos.",
-        icone: "log-out-outline",
-      };
-    }
-
-    if (modal === "notificacoes") {
-      return {
-        titulo: "Notificações",
-        descricao:
-          "O sistema de notificações ainda não foi implementado.",
-        icone: "notifications-outline",
-      };
-    }
-
-    if (modal === "ajuda") {
-      return {
-        titulo: "Ajuda e suporte",
-        descricao:
-          "Utilize o menu para cadastrar doações, consultar seus alimentos e acompanhar suas contribuições.",
-        icone: "help-circle-outline",
-      };
-    }
-
-    return {
-      titulo: "Sobre o Alimenta+",
-      descricao:
-        "O Alimenta+ é um projeto de TCC desenvolvido para combater o desperdício de alimentos e incentivar a solidariedade.",
-      icone: "information-circle-outline",
-    };
-  }
-
-  const informacoes = conteudoModal();
+  const informacoes = {
+    titulo: "Sair da conta?",
+    descricao:
+      "Tem certeza de que deseja sair do Alimenta+? Seus dados e suas doações continuarão salvos.",
+    icone: "log-out-outline",
+  };
 
   // ======================================
   // INTERFACE
@@ -303,6 +252,21 @@ export default function TelaPerfil({ navigation }) {
             <Text style={styles.titulo}>
               Meu perfil
             </Text>
+
+            <TouchableOpacity
+              style={styles.configuracoes}
+              onPress={() =>
+                navigation.navigate("TelaConfiguracoes")
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Abrir configurações"
+            >
+              <Ionicons
+                name="settings-outline"
+                size={21}
+                color={VERDE}
+              />
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.subtitulo}>
@@ -561,14 +525,14 @@ const styles = StyleSheet.create({
 
   conteudo: {
     padding: 19,
-    paddingBottom: 125,
+    paddingBottom: 30,
   },
 
   topo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingRight: 56,
+    paddingRight: 0,
   },
 
   voltar: {
@@ -578,6 +542,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#E6F0DF",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  configuracoes: {
+    width: 40,
+    height: 40,
+    borderRadius: 21,
+    backgroundColor: "#E6F0DF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: "auto",
   },
 
   titulo: {
@@ -805,4 +779,4 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_600SemiBold",
     fontSize: 14,
   },
-});
+})

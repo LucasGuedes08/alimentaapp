@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 
 import {
@@ -85,4 +84,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "transparent",
   },
-});
+})

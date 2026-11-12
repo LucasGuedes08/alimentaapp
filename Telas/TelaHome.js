@@ -8,7 +8,7 @@ import React, {
 
 import {
   View,
-  Text,
+  Text as TextoNativo,
   TextInput,
   Image,
   ScrollView,
@@ -23,6 +23,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signOut } from "firebase/auth";
+import { IMAGENS_CATALOGO } from "../assets/images/catalogo/mapa";
+import {
+  calcularPrecoPromocional,
+  obterPrecoAtual,
+  obterPrecoOriginal,
+} from "../utils/precosProdutos";
 
 import {
   collection,
@@ -46,8 +52,32 @@ const VERDE = "#006838";
 const VERDE_BOTAO = "#378B20";
 const FUNDO = "#FFFCF6";
 
+function Text({ style, ...props }) {
+  const estiloOriginal = StyleSheet.flatten(style) || {};
+  const pesoFonte = String(estiloOriginal.fontWeight || "400");
+  const estiloSemPeso = { ...estiloOriginal };
+  delete estiloSemPeso.fontWeight;
+
+  const familiaFonte =
+    estiloOriginal.fontFamily ||
+    (pesoFonte === "500"
+      ? "Poppins_500Medium"
+      : pesoFonte === "600"
+      ? "Poppins_600SemiBold"
+      : ["700", "800", "bold"].includes(pesoFonte)
+      ? "Poppins_700Bold"
+      : "Poppins_400Regular");
+
+  return (
+    <TextoNativo
+      {...props}
+      style={[estiloSemPeso, { fontFamily: familiaFonte }]}
+    />
+  );
+}
+
 // ========================================
-// IMAGENS DOS 15 ALIMENTOS
+// IMAGENS DO CATÁLOGO DE ALIMENTOS
 // ========================================
 
 const IMAGENS = {
@@ -66,6 +96,7 @@ const IMAGENS = {
   tomate: require("../assets/images/tabIcons/tomate.png"),
   cenoura: require("../assets/images/tabIcons/cenoura.png"),
   alface: require("../assets/images/tabIcons/alface.png"),
+  ...IMAGENS_CATALOGO,
 };
 
 // ========================================
@@ -97,7 +128,7 @@ const ABAS = [
   {
     id: "eventos",
     nome: "Eventos",
-    icone: "calendar-outline",
+    icone: "map-outline",
   },
   {
     id: "doar",
@@ -112,11 +143,11 @@ const ABAS = [
 ];
 
 // ========================================
-// 15 ALIMENTOS DE DEMONSTRAÇÃO
+// 35 ALIMENTOS DE DEMONSTRAÇÃO
 // ========================================
 
 // Valores ilustrativos para demonstração do TCC.
-// Todas as doações são gratuitas.
+// O preço atual aplica 10% de desconto sobre o preço original.
 
 const EXEMPLOS = [
   {
@@ -314,6 +345,266 @@ const EXEMPLOS = [
     descricao:
       "Alface fresca para saladas, conservada adequadamente.",
   },
+  {
+    id: "batatas",
+    nome: "Batatas",
+    estabelecimento: "Feira Solidária",
+    categoria: "Hortifruti",
+    quantidade: 12,
+    unidade: "kg",
+    precoReferencia: 6.99,
+    precoUnidade: "kg",
+    imagemChave: "batatas",
+    descricao:
+      "Batatas para o preparo de acompanhamentos, sopas e refeições.",
+  },
+  {
+    id: "cebolas",
+    nome: "Cebolas",
+    estabelecimento: "Feira Solidária",
+    categoria: "Hortifruti",
+    quantidade: 8,
+    unidade: "kg",
+    precoReferencia: 7.49,
+    precoUnidade: "kg",
+    imagemChave: "cebolas",
+    descricao:
+      "Cebolas para temperar e preparar refeições do dia a dia.",
+  },
+  {
+    id: "abobrinhas",
+    nome: "Abobrinhas",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 6,
+    unidade: "kg",
+    precoReferencia: 8.99,
+    precoUnidade: "kg",
+    imagemChave: "abobrinhas",
+    descricao:
+      "Abobrinhas frescas para refogados e outros preparos.",
+  },
+  {
+    id: "repolhos",
+    nome: "Repolhos",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 10,
+    unidade: "unidades",
+    precoReferencia: 5.99,
+    precoUnidade: "unidade",
+    imagemChave: "repolhos",
+    descricao:
+      "Repolhos frescos para saladas, refogados e acompanhamentos.",
+  },
+  {
+    id: "couve",
+    nome: "Maços de couve",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 15,
+    unidade: "unidades",
+    precoReferencia: 4.99,
+    precoUnidade: "maço",
+    imagemChave: "couve",
+    descricao:
+      "Couve fresca para saladas, refogados e acompanhamentos.",
+  },
+  {
+    id: "brocolis",
+    nome: "Brócolis",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 8,
+    unidade: "kg",
+    precoReferencia: 12.99,
+    precoUnidade: "kg",
+    imagemChave: "brocolis",
+    descricao:
+      "Brócolis frescos para acompanhar refeições e preparar receitas.",
+  },
+  {
+    id: "pepinos",
+    nome: "Pepinos",
+    estabelecimento: "Feira Solidária",
+    categoria: "Hortifruti",
+    quantidade: 5,
+    unidade: "kg",
+    precoReferencia: 6.49,
+    precoUnidade: "kg",
+    imagemChave: "pepinos",
+    descricao:
+      "Pepinos frescos para saladas e acompanhamentos.",
+  },
+  {
+    id: "beterrabas",
+    nome: "Beterrabas",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 7,
+    unidade: "kg",
+    precoReferencia: 7.99,
+    precoUnidade: "kg",
+    imagemChave: "beterrabas",
+    descricao:
+      "Beterrabas para saladas, sopas e outros preparos.",
+  },
+  {
+    id: "aboboras",
+    nome: "Abóboras",
+    estabelecimento: "Feira Solidária",
+    categoria: "Hortifruti",
+    quantidade: 9,
+    unidade: "kg",
+    precoReferencia: 6.99,
+    precoUnidade: "kg",
+    imagemChave: "aboboras",
+    descricao:
+      "Abóboras para sopas, purês e acompanhamentos.",
+  },
+  {
+    id: "mandiocas",
+    nome: "Mandiocas",
+    estabelecimento: "Feira Solidária",
+    categoria: "Hortifruti",
+    quantidade: 10,
+    unidade: "kg",
+    precoReferencia: 7.99,
+    precoUnidade: "kg",
+    imagemChave: "mandiocas",
+    descricao:
+      "Mandiocas para cozidos, sopas e acompanhamentos.",
+  },
+  {
+    id: "pimentoes",
+    nome: "Pimentões",
+    estabelecimento: "Horta Comunitária",
+    categoria: "Hortifruti",
+    quantidade: 5,
+    unidade: "kg",
+    precoReferencia: 10.99,
+    precoUnidade: "kg",
+    imagemChave: "pimentoes",
+    descricao:
+      "Pimentões para saladas, refogados e preparo de refeições.",
+  },
+  {
+    id: "aveia",
+    nome: "Aveia em flocos 500 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 18,
+    unidade: "pacotes",
+    precoReferencia: 7.49,
+    precoUnidade: "pacote",
+    imagemChave: "aveia",
+    descricao:
+      "Aveia em flocos em embalagem fechada de 500 g.",
+  },
+  {
+    id: "fuba",
+    nome: "Fubá 1 kg",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 14,
+    unidade: "pacotes",
+    precoReferencia: 4.49,
+    precoUnidade: "pacote",
+    imagemChave: "fuba",
+    descricao:
+      "Fubá em pacote fechado de 1 kg para receitas e acompanhamentos.",
+  },
+  {
+    id: "milho",
+    nome: "Milho em conserva 170 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 20,
+    unidade: "unidades",
+    precoReferencia: 4.29,
+    precoUnidade: "lata",
+    imagemChave: "milho",
+    descricao:
+      "Milho em conserva em lata fechada de 170 g.",
+  },
+  {
+    id: "lentilha",
+    nome: "Lentilha 500 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 16,
+    unidade: "pacotes",
+    precoReferencia: 8.49,
+    precoUnidade: "pacote",
+    imagemChave: "lentilha",
+    descricao:
+      "Lentilha em pacote fechado de 500 g para compor refeições.",
+  },
+  {
+    id: "grao-de-bico",
+    nome: "Grão de bico 500 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 12,
+    unidade: "pacotes",
+    precoReferencia: 9.49,
+    precoUnidade: "pacote",
+    imagemChave: "grao-de-bico",
+    descricao:
+      "Grão de bico em pacote fechado de 500 g.",
+  },
+  {
+    id: "sardinha",
+    nome: "Sardinha em conserva 125 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 16,
+    unidade: "unidades",
+    precoReferencia: 6.49,
+    precoUnidade: "lata",
+    imagemChave: "sardinha",
+    descricao:
+      "Sardinha em conserva em lata fechada de 125 g.",
+  },
+  {
+    id: "atum",
+    nome: "Atum em conserva 170 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 14,
+    unidade: "unidades",
+    precoReferencia: 8.99,
+    precoUnidade: "lata",
+    imagemChave: "atum",
+    descricao:
+      "Atum em conserva em lata fechada de 170 g.",
+  },
+  {
+    id: "extrato-de-tomate",
+    nome: "Extrato de tomate 300 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 18,
+    unidade: "unidades",
+    precoReferencia: 4.49,
+    precoUnidade: "embalagem",
+    imagemChave: "extrato-de-tomate",
+    descricao:
+      "Extrato de tomate em embalagem fechada de 300 g.",
+  },
+  {
+    id: "molho-de-tomate",
+    nome: "Molho de tomate 300 g",
+    estabelecimento: "Mercado Comunitário",
+    categoria: "Mercearia",
+    quantidade: 18,
+    unidade: "unidades",
+    precoReferencia: 3.99,
+    precoUnidade: "embalagem",
+    imagemChave: "molho-de-tomate",
+    descricao:
+      "Molho de tomate em embalagem fechada de 300 g.",
+  },
 ];
 
 // ========================================
@@ -399,6 +690,10 @@ function obterData(item) {
 }
 
 function moeda(valor) {
+  if (valor === null || valor === undefined || valor === "") {
+    return "";
+  }
+
   const numero = Number(valor);
 
   if (!Number.isFinite(numero)) {
@@ -426,6 +721,40 @@ function correspondeInicio(nome, termos) {
       nome.startsWith(termo + " ") ||
       nome.startsWith(termo + "-")
   );
+}
+
+function chaveTipoProduto(produto) {
+  const imagemChave = produto.imagemChave;
+
+  if (imagemChave && IMAGENS[imagemChave]) {
+    return imagemChave === "biscoito" ? "bolacha" : imagemChave;
+  }
+
+  const nome = normalizar(produto.nome);
+  const catalogo = [...MERCEARIA, ...VERDURAS].sort(
+    (a, b) => b.length - a.length
+  );
+  const produtoCatalogo = catalogo.find(
+    (termo) =>
+      nome === termo ||
+      nome.startsWith(`${termo} `) ||
+      nome.startsWith(`${termo}-`)
+  );
+
+  if (produtoCatalogo) {
+    return produtoCatalogo === "biscoito"
+      ? "bolacha"
+      : produtoCatalogo;
+  }
+
+  const nomeImagem = Object.keys(IMAGENS).find(
+    (chave) =>
+      nome === chave ||
+      nome.startsWith(`${chave} `) ||
+      nome.startsWith(`${chave}-`)
+  );
+
+  return nomeImagem || nome;
 }
 
 // ========================================
@@ -489,6 +818,30 @@ function produtoPermitido(produto) {
 // ========================================
 
 function resolverImagem(produto) {
+  const imagemCadastrada =
+    produto.imagemUrl ||
+    produto.imageUrl ||
+    produto.fotoUrl ||
+    produto.foto ||
+    produto.imagem;
+
+  if (
+    typeof imagemCadastrada === "string" &&
+    /^(https?:\/\/|data:image\/|file:\/\/|content:\/\/)/i.test(
+      imagemCadastrada.trim()
+    )
+  ) {
+    return { uri: imagemCadastrada.trim() };
+  }
+
+  if (typeof imagemCadastrada === "string" && IMAGENS[imagemCadastrada]) {
+    return IMAGENS[imagemCadastrada];
+  }
+
+  if (imagemCadastrada?.uri) {
+    return imagemCadastrada;
+  }
+
   if (
     produto.imagemChave &&
     IMAGENS[produto.imagemChave]
@@ -541,28 +894,23 @@ function resolverImagem(produto) {
 // PREÇOS DOS ALIMENTOS
 // ========================================
 
-function precoDeReferencia(produto) {
-  if (
-    typeof produto.precoReferencia === "number" &&
-    Number.isFinite(produto.precoReferencia)
-  ) {
-    return `${moeda(produto.precoReferencia)} / ${
-      produto.precoUnidade || "unidade"
-    }`;
-  }
-
+function obterPrecosExibidos(produto) {
   const exemplo = obterExemplo(produto);
+  const precoOriginal =
+    obterPrecoOriginal(produto) ??
+    (produto.demonstracao === true
+      ? exemplo?.precoReferencia
+      : null);
+  const precoAtual =
+    obterPrecoAtual(produto) ??
+    (produto.demonstracao === true
+      ? calcularPrecoPromocional(precoOriginal)
+      : null);
 
-  if (
-    produto.demonstracao === true &&
-    exemplo
-  ) {
-    return `${moeda(exemplo.precoReferencia)} / ${
-      exemplo.precoUnidade
-    }`;
-  }
-
-  return null;
+  return {
+    precoAtual: moeda(precoAtual),
+    precoOriginal: moeda(precoOriginal),
+  };
 }
 
 // ========================================
@@ -657,7 +1005,7 @@ export default function TelaHome({ navigation, route }) {
 
         setErroLista(
           erro.code === "permission-denied"
-            ? "Permissão negada. Confira as regras do Firestore."
+            ? "Não foi possível carregar os alimentos. Verifique a conexão e tente novamente."
             : "Não foi possível carregar os alimentos."
         );
       }
@@ -704,6 +1052,12 @@ export default function TelaHome({ navigation, route }) {
       return (
         Boolean(referencia) &&
         (
+          produto.precoAtual !==
+            calcularPrecoPromocional(referencia.precoReferencia) ||
+          produto.preco !==
+            moeda(calcularPrecoPromocional(referencia.precoReferencia)) ||
+          produto.precoAntigo !==
+            moeda(referencia.precoReferencia) ||
           produto.precoReferencia !==
             referencia.precoReferencia ||
           produto.precoUnidade !==
@@ -739,32 +1093,26 @@ export default function TelaHome({ navigation, route }) {
       );
     });
 
-    const cestaPrioritaria = filtrados.findIndex(
-      (produto) =>
-        normalizar(produto.nome).includes("cesta") &&
-        normalizar(produto.nome).includes("basica") &&
-        produto.demonstracao !== true
-    );
-    const cestaExibida =
-      cestaPrioritaria >= 0
-        ? cestaPrioritaria
-        : filtrados.findIndex(
-            (produto) =>
-              normalizar(produto.nome).includes("cesta") &&
-              normalizar(produto.nome).includes("basica")
-          );
+    const unicosPorTipo = new Map();
 
-    return filtrados.filter((produto, indice) => {
-      const cestaBasica =
-        normalizar(produto.nome).includes("cesta") &&
-        normalizar(produto.nome).includes("basica");
+    filtrados.forEach((produto) => {
+      const chave = chaveTipoProduto(produto);
+      const existente = unicosPorTipo.get(chave);
 
-      return !cestaBasica || indice === cestaExibida;
+      if (
+        !existente ||
+        (existente.demonstracao === true &&
+          produto.demonstracao !== true)
+      ) {
+        unicosPorTipo.set(chave, produto);
+      }
     });
+
+    return Array.from(unicosPorTipo.values());
   }, [alimentos, categoria, busca]);
 
   // ========================================
-  // INSERIR OS 15 EXEMPLOS NO FIRESTORE
+  // INSERIR OS EXEMPLOS NO FIRESTORE
   // ========================================
 
   async function inserirExemplos() {
@@ -806,7 +1154,7 @@ export default function TelaHome({ navigation, route }) {
 
       if (pendentes.length === 0) {
         setAviso(
-          "Os 15 exemplos já estão cadastrados."
+          "Todos os alimentos de demonstração já estão cadastrados."
         );
         return;
       }
@@ -814,6 +1162,10 @@ export default function TelaHome({ navigation, route }) {
       const lote = writeBatch(db);
 
       pendentes.forEach(({ item, referencia }) => {
+        const precoAtual = calcularPrecoPromocional(
+          item.precoReferencia
+        );
+
         lote.set(referencia, {
           nome: item.nome,
           estabelecimento: item.estabelecimento,
@@ -826,8 +1178,9 @@ export default function TelaHome({ navigation, route }) {
           descricao: item.descricao,
           validade: "",
 
-          preco: "Gratuito",
-          precoAntigo: "",
+          preco: moeda(precoAtual),
+          precoAtual,
+          precoAntigo: moeda(item.precoReferencia),
 
           precoReferencia: item.precoReferencia,
           precoUnidade: item.precoUnidade,
@@ -855,7 +1208,7 @@ export default function TelaHome({ navigation, route }) {
 
       setAviso(
         erro.code === "permission-denied"
-          ? "Sem permissão para cadastrar. Confira as regras do Firestore."
+          ? "Não foi possível cadastrar exemplos. Verifique a conexão e tente novamente."
           : "Não foi possível inserir os exemplos."
       );
     } finally {
@@ -864,7 +1217,7 @@ export default function TelaHome({ navigation, route }) {
   }
 
   // ========================================
-  // ATUALIZAR PREÇOS DE REFERÊNCIA
+  // ATUALIZAR PREÇOS PROMOCIONAIS
   // ========================================
 
   async function atualizarPrecos() {
@@ -890,10 +1243,14 @@ export default function TelaHome({ navigation, route }) {
           );
 
           const documento = await getDoc(referencia);
+          const precoAtual = calcularPrecoPromocional(
+            item.precoReferencia
+          );
 
           return {
             item,
             referencia,
+            precoAtual,
             dados: documento.exists()
               ? documento.data()
               : null,
@@ -902,10 +1259,14 @@ export default function TelaHome({ navigation, route }) {
       );
 
       const permitidos = verificacoes.filter(
-        ({ item, dados }) =>
+        ({ item, dados, precoAtual }) =>
           dados?.demonstracao === true &&
           dados?.criadoPor === atual.uid &&
           (
+            dados?.precoAtual !== precoAtual ||
+            dados?.preco !== moeda(precoAtual) ||
+            dados?.precoAntigo !==
+              moeda(item.precoReferencia) ||
             dados?.precoReferencia !==
               item.precoReferencia ||
             dados?.precoUnidade !==
@@ -922,8 +1283,11 @@ export default function TelaHome({ navigation, route }) {
 
       const lote = writeBatch(db);
 
-      permitidos.forEach(({ item, referencia }) => {
+      permitidos.forEach(({ item, referencia, precoAtual }) => {
         lote.update(referencia, {
+          preco: moeda(precoAtual),
+          precoAtual,
+          precoAntigo: moeda(item.precoReferencia),
           precoReferencia: item.precoReferencia,
           precoUnidade: item.precoUnidade,
           atualizadoEm: serverTimestamp(),
@@ -933,7 +1297,7 @@ export default function TelaHome({ navigation, route }) {
       await lote.commit();
 
       setAviso(
-        `${permitidos.length} preço(s) de referência atualizado(s).`
+        `${permitidos.length} preço(s) promocional(is) atualizado(s).`
       );
     } catch (erro) {
       console.error(
@@ -943,7 +1307,7 @@ export default function TelaHome({ navigation, route }) {
 
       setAviso(
         erro.code === "permission-denied"
-          ? "Sem permissão para atualizar. Confira as regras do Firestore e o campo criadoPor."
+          ? "Não foi possível atualizar. Tente novamente mais tarde."
           : "Não foi possível atualizar os preços."
       );
     } finally {
@@ -995,10 +1359,14 @@ export default function TelaHome({ navigation, route }) {
       abrirBusca();
     } else if (id === "doar") {
       abrirCadastro();
+    } else if (id === "eventos") {
+      setAbaAtiva("eventos");
+      navigation.navigate("TelaEventos");
+    } else if (id === "perfil") {
+      setAbaAtiva("perfil");
+      navigation.navigate("TelaPerfil");
     } else {
-      setAbaAtiva(id);
-      setErroSair("");
-      setModal(id);
+      setAbaAtiva("inicio");
     }
   }
 
@@ -1030,9 +1398,17 @@ export default function TelaHome({ navigation, route }) {
 
     navigation.navigate("TelaDetalhesProduto", {
       produtoId: produto.id,
-      precoReferencia:
-        produto.precoReferencia ??
-        exemplo?.precoReferencia,
+    precoAtual:
+      obterPrecoAtual(produto) ??
+      (exemplo
+        ? calcularPrecoPromocional(exemplo.precoReferencia)
+        : null),
+    precoAntigo:
+      obterPrecoOriginal(produto) ??
+      exemplo?.precoReferencia,
+    precoReferencia:
+      produto.precoReferencia ??
+      exemplo?.precoReferencia,
       precoUnidade:
         produto.precoUnidade ||
         exemplo?.precoUnidade,
@@ -1271,6 +1647,24 @@ export default function TelaHome({ navigation, route }) {
             </Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.minhasDoacoesBotao}
+            onPress={() =>
+              navigation.navigate("TelaCarrinhoDoacoes")
+            }
+            accessibilityLabel="Carrinho de doações"
+          >
+            <Ionicons
+              name="cart-outline"
+              size={20}
+              color={VERDE}
+            />
+
+            <Text style={styles.minhasDoacoesTexto}>
+              Carrinho de doações
+            </Text>
+          </TouchableOpacity>
+
           {/* ==================================
               INSERIR EXEMPLOS DO TCC
           ================================== */}
@@ -1280,13 +1674,12 @@ export default function TelaHome({ navigation, route }) {
             !todosExemplosInseridos && (
               <View style={styles.painelExemplos}>
                 <Text style={styles.exemploTitulo}>
-                  Dados de teste do TCC
+          Alimentos do catálogo
                 </Text>
 
                 <Text style={styles.exemploInfo}>
-                  Inclui a cesta básica completa,
-                  seus itens separados, água,
-                  leite longa vida e verduras.
+          Mercearia, enlatados, bebidas e hortifruti.
+          Quantidades e valores são demonstrativos.
                 </Text>
 
                 <TouchableOpacity
@@ -1300,7 +1693,7 @@ export default function TelaHome({ navigation, route }) {
                     />
                   ) : (
                     <Text style={styles.botaoVerdeTexto}>
-                      Inserir 15 exemplos do TCC
+                      Adicionar {EXEMPLOS.length} alimentos ao catálogo
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -1323,7 +1716,7 @@ export default function TelaHome({ navigation, route }) {
                   <ActivityIndicator color={VERDE} />
                 ) : (
                   <Text style={styles.botaoAtualizarTexto}>
-                    Atualizar preços de referência
+                    Atualizar preços do catálogo
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1391,7 +1784,8 @@ export default function TelaHome({ navigation, route }) {
             !erroLista &&
             produtosVisiveis.map((produto) => {
               const imagem = resolverImagem(produto);
-              const referencia = precoDeReferencia(produto);
+              const { precoAtual, precoOriginal } =
+                obterPrecosExibidos(produto);
 
               return (
                 <View
@@ -1446,18 +1840,21 @@ export default function TelaHome({ navigation, route }) {
                       {produto.estabelecimento || "Doador"}
                     </Text>
 
-                    <Text style={styles.precoGratuito}>
-                      {produto.demonstracao
-                        ? "Exemplo fictício"
-                        : "Doação gratuita"}
-                    </Text>
-
-                    {!!referencia && (
+                    {precoAtual ? (
                       <Text
-                        style={styles.precoReferencia}
-                        numberOfLines={2}
+                        style={styles.precoAtual}
                       >
-                        Varejo: {referencia}
+                        {precoAtual}
+                      </Text>
+                    ) : (
+                      <Text style={styles.precoGratuito}>
+                        Doação gratuita
+                      </Text>
+                    )}
+
+                    {!!precoAtual && !!precoOriginal && (
+                      <Text style={styles.precoReferencia}>
+                        De {precoOriginal}
                       </Text>
                     )}
 
@@ -1500,22 +1897,16 @@ export default function TelaHome({ navigation, route }) {
               <Ionicons
                 name={item.icone}
                 size={23}
-                color={
-                  abaAtiva === item.id
-                    ? VERDE
-                    : "#333333"
-                }
+                color="#111111"
               />
 
               <Text
-                style={[
-                  styles.itemMenuTexto,
-                  abaAtiva === item.id &&
-                    styles.itemMenuAtivo,
-                ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={styles.itemMenuTexto}
               >
-                {item.nome}
+                {item.id === "inicio" ? "Início" : item.nome}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1587,7 +1978,7 @@ export default function TelaHome({ navigation, route }) {
 
                 <Text style={styles.modalDescricao}>
                   Sair da conta não apaga seu cadastro
-                  nem suas doações do Firebase.
+                  nem suas doações.
                 </Text>
 
                 <TouchableOpacity
@@ -1647,22 +2038,33 @@ export default function TelaHome({ navigation, route }) {
                       "Sem descrição."}
                   </Text>
 
-                  {!!precoDeReferencia(
+                  {!!obterPrecosExibidos(
                     produtoSelecionado || {}
-                  ) && (
-                    <Text style={styles.modalDescricao}>
-                      Preço de referência no varejo:{" "}
-                      {precoDeReferencia(
-                        produtoSelecionado
-                      )}
-                      . A doação é gratuita.
-                    </Text>
+                  ).precoAtual &&
+                    !!obterPrecosExibidos(
+                      produtoSelecionado || {}
+                    ).precoOriginal && (
+                    <View style={styles.modalLinhaPreco}>
+                      <Text style={styles.precoAtual}>
+                        {
+                          obterPrecosExibidos(
+                            produtoSelecionado
+                          ).precoAtual
+                        }
+                      </Text>
+                      <Text style={styles.precoReferencia}>
+                        De{" "}
+                        {
+                          obterPrecosExibidos(
+                            produtoSelecionado
+                          ).precoOriginal
+                        }
+                      </Text>
+                    </View>
                   )}
 
                   <Text style={styles.avisoDetalhes}>
-                    {produtoSelecionado?.demonstracao
-                      ? "Alimento fictício para demonstração do TCC. Não está disponível para retirada."
-                      : "A funcionalidade de reserva e retirada ainda não está implementada."}
+                    Preços ilustrativos; o pagamento é apenas uma simulação.
                   </Text>
                 </ScrollView>
 
@@ -1767,6 +2169,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     height: "100%",
+    fontFamily: "Poppins_400Regular",
     fontSize: 12,
     color: "#222222",
   },
@@ -2048,10 +2451,24 @@ const styles = StyleSheet.create({
     marginTop: 7,
   },
 
+  precoAtual: {
+    color: "#3F7841",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+
   precoReferencia: {
     color: "#667966",
     fontSize: 11,
     marginTop: 4,
+    textDecorationLine: "line-through",
+  },
+
+  modalLinhaPreco: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
   quantidade: {
@@ -2077,30 +2494,27 @@ const styles = StyleSheet.create({
 
   // MENU INFERIOR
   menuInferior: {
-    minHeight: 57,
+    minHeight: 46,
     flexDirection: "row",
     alignItems: "stretch",
-    borderTopWidth: 1,
-    borderTopColor: "#D1D1D1",
+    borderWidth: 1,
+    borderColor: "#B7B7B7",
     backgroundColor: FUNDO,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
   },
 
   itemMenu: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 3,
+    minHeight: 44,
+    gap: 1,
   },
 
   itemMenuTexto: {
-    color: "#333333",
-    fontSize: 10,
-  },
-
-  itemMenuAtivo: {
-    color: VERDE,
-    fontWeight: "700",
+    fontFamily: "Poppins_400Regular",
+    color: "#111111",
+    fontSize: 12,
   },
 
   // MODAIS

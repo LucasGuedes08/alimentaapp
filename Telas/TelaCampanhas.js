@@ -1,4 +1,3 @@
-
 import React, {
   useMemo,
   useState,
@@ -11,8 +10,6 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -33,6 +30,9 @@ const CAMPANHAS = [
     descricao:
       "Doação de cestas básicas para famílias de baixa renda.",
     status: "Ativa",
+    prazo: "Até 30 de dezembro",
+    percentual: 70,
+    metaTexto: "700 de 1000 cestas",
     imagem: require(
       "../assets/images/tabIcons/cesta-basica.png"
     ),
@@ -81,9 +81,6 @@ export default function TelaCampanhas({
     filtrosAbertos,
     setFiltrosAbertos,
   ] = useState(false);
-
-  const [selecionada, setSelecionada] =
-    useState(null);
 
   // FILTRAR CAMPANHAS
   const lista = useMemo(
@@ -233,8 +230,8 @@ export default function TelaCampanhas({
 
           <Text style={styles.demo}>
             Prévia de campanhas para demonstração
-            do TCC. Nenhuma destas campanhas
-            está publicada no Firestore.
+            do TCC. As informações podem ser
+            atualizadas pela equipe responsável.
           </Text>
 
           {/* LISTA DE CAMPANHAS */}
@@ -250,7 +247,9 @@ export default function TelaCampanhas({
                 key={campanha.id}
                 style={styles.card}
                 onPress={() =>
-                  setSelecionada(campanha)
+                  navigation.navigate("TelaDetalheCampanha", {
+                    campanha,
+                  })
                 }
                 activeOpacity={0.85}
               >
@@ -317,57 +316,6 @@ export default function TelaCampanhas({
         </ScrollView>
       </View>
 
-      {/* DETALHES DEMONSTRATIVOS */}
-      <Modal
-        visible={!!selecionada}
-        transparent
-        animationType="fade"
-        onRequestClose={() =>
-          setSelecionada(null)
-        }
-      >
-        <View style={styles.modalFundo}>
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={() =>
-              setSelecionada(null)
-            }
-          />
-
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitulo}>
-              {selecionada?.nome}
-            </Text>
-
-            <Text style={styles.modalDescricao}>
-              {selecionada?.descricao}
-            </Text>
-
-            <Text style={styles.modalDescricao}>
-              Status ilustrativo:{" "}
-              {selecionada?.status}
-            </Text>
-
-            <Text style={styles.modalNota}>
-              Este card é somente uma prévia do
-              design. A participação e a gestão
-              de campanhas reais exigem cadastro
-              e regras próprias no Firestore.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.fechar}
-              onPress={() =>
-                setSelecionada(null)
-              }
-            >
-              <Text style={styles.fecharTexto}>
-                Fechar
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -386,7 +334,7 @@ const styles = StyleSheet.create({
 
   conteudo: {
     padding: 19,
-    paddingBottom: 128,
+    paddingBottom: 24,
   },
 
   topo: {
@@ -564,51 +512,4 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
 
-  modalFundo: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,.4)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 22,
-  },
-
-  modalCard: {
-    width: "100%",
-    maxWidth: 440,
-    backgroundColor: FUNDO,
-    borderRadius: 17,
-    padding: 20,
-    gap: 12,
-  },
-
-  modalTitulo: {
-    fontFamily: "Poppins_700Bold",
-    fontSize: 20,
-    color: VERDE,
-  },
-
-  modalDescricao: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#333333",
-  },
-
-  modalNota: {
-    fontSize: 12,
-    color: "#8B7448",
-    lineHeight: 19,
-  },
-
-  fechar: {
-    backgroundColor: VERDE,
-    minHeight: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-  },
-
-  fecharTexto: {
-    fontFamily: "Poppins_600SemiBold",
-    color: "#FFFFFF",
-  },
-});
+})

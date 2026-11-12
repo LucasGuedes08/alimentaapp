@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import MenuInferior from "../components/MenuInferior";
+import { IMAGENS_CATALOGO } from "../assets/images/catalogo/mapa";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+import { auth } from "../firebase";
+import { db } from "../firebaseDb";
 
 const VERDE = "#006838";
 const VERDE_CLARO = "#E9F4E2";
@@ -26,6 +36,7 @@ const IMAGENS = {
   arroz: require("../assets/images/tabIcons/arroz.png"),
   feijao: require("../assets/images/tabIcons/feijao.webp"),
   macarrao: require("../assets/images/tabIcons/macarrao.png"),
+  farinha: require("../assets/images/tabIcons/farinhadetrigo.webp"),
   cafe: require("../assets/images/tabIcons/cafe.png"),
   acucar: require("../assets/images/tabIcons/acucar.png"),
   sal: require("../assets/images/tabIcons/sal.png"),
@@ -35,6 +46,7 @@ const IMAGENS = {
   tomate: require("../assets/images/tabIcons/tomate.png"),
   cenoura: require("../assets/images/tabIcons/cenoura.png"),
   alface: require("../assets/images/tabIcons/alface.png"),
+  ...IMAGENS_CATALOGO,
 };
 
 const DOACOES_EXEMPLO = [
@@ -97,23 +109,190 @@ const DOACOES_EXEMPLO = [
   },
 ];
 
+const IMAGEM_POR_ALIMENTO = {
+  "cesta basica": "cestaBasica",
+  macarrao: "macarrao",
+  feijao: "feijao",
+  oleo: "oleo",
+  acucar: "acucar",
+  biscoito: "bolacha",
+  bolacha: "bolacha",
+  farinha: "farinha",
+  cenoura: "cenoura",
+  tomate: "tomate",
+  alface: "alface",
+  arroz: "arroz",
+  cafe: "cafe",
+  leite: "leite",
+  sal: "sal",
+  agua: "agua",
+};
+
+const TIPO_CARD_POR_IMAGEM = {
+  cesta: "cestaBasica",
+  arroz: "arroz",
+  feijao: "feijao",
+  macarrao: "macarrao",
+  oleo: "oleo",
+  acucar: "acucar",
+  sal: "sal",
+  farinha: "farinha",
+  cafe: "cafe",
+  biscoito: "bolacha",
+  leite: "leite",
+  agua: "agua",
+  tomate: "tomate",
+  cenoura: "cenoura",
+  alface: "alface",
+};
+
+function normalizar(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function obterTipoImagem(nome) {
+  const nomeNormalizado = normalizar(nome);
+  const alimento = Object.keys(IMAGEM_POR_ALIMENTO).find(
+    (chave) =>
+      nomeNormalizado === chave ||
+      nomeNormalizado.startsWith(`${chave} `) ||
+      nomeNormalizado.startsWith(`${chave}-`)
+  );
+
+  return alimento ? IMAGEM_POR_ALIMENTO[alimento] : null;
+}
+
+function formatarData(valor) {
+  const data = valor?.toDate
+    ? valor.toDate()
+    : valor
+    ? new Date(valor)
+    : new Date();
+
+  if (Number.isNaN(data.getTime())) {
+    return "Data indisponível";
+  }
+
+  return data.toLocaleDateString("pt-BR");
+}
+
+function formatarMoeda(valor) {
+  const numero = Number(valor);
+  return Number.isFinite(numero)
+    ? `R$ ${numero.toFixed(2).replace(".", ",")}`
+    : null;
+}
+
+function converterDoacao(documento) {
+  const dados = documento.data();
+  const itensAgrupados =
+    dados.tipoDoacao === "agrupada" && Array.isArray(dados.itens)
+      ? dados.itens
+      : null;
+  const primeiroItem = itensAgrupados?.[0];
+  const imagemChave = primeiroItem?.imagemChave || dados.imagemChave;
+  const tipoImagem =
+    (IMAGENS[imagemChave] ? imagemChave : null) ||
+    TIPO_CARD_POR_IMAGEM[imagemChave] ||
+    obterTipoImagem(dados.nome);
+  const itens = itensAgrupados
+    ? itensAgrupados.map((item) => {
+        const subtotal = formatarMoeda(item.subtotal);
+        return `${item.nome} — ${item.quantidade} ${item.unidade}${
+          subtotal ? ` · ${subtotal}` : ""
+        }`;
+      })
+    : [`${dados.nome} — ${dados.quantidade} ${dados.unidade}`];
+  const agrupada = dados.tipoDoacao === "agrupada";
+
+  return {
+    id: `firestore-${documento.id}`,
+    nome: dados.nome,
+    instituicao: dados.estabelecimento || "Mercado comunitário",
+    data: formatarData(dados.criadoEm),
+    quantidade: agrupada
+      ? dados.quantidadeItens || itens.length
+      : dados.quantidade,
+    unidade: agrupada ? "itens" : dados.unidade,
+    status: dados.status,
+    tipoImagem,
+    itens,
+    localRetirada: dados.cidade,
+    descricao: dados.descricao || "Esta doação ainda está em andamento.",
+    total: agrupada ? dados.total : null,
+    tipoDoacao: dados.tipoDoacao || "item",
+    instituicaoBeneficiada: {
+      nome: "Não informada",
+      cidade: dados.cidade,
+      descricao:
+        "A instituição beneficiada ainda não foi registrada nesta doação.",
+    },
+  };
+}
+
 export default function TelaMinhasDoacoes({ navigation }) {
   const [filtro, setFiltro] = useState("Todas");
+  const [doacoesFirestore, setDoacoesFirestore] = useState([]);
+  const [erroFirestore, setErroFirestore] = useState("");
+
+  useEffect(() => {
+    const usuario = auth.currentUser;
+
+    if (!usuario) {
+      setErroFirestore("Faça login para consultar suas doações.");
+      return undefined;
+    }
+
+    const consulta = query(
+      collection(db, "minhasDoacoes"),
+      where("criadoPor", "==", usuario.uid)
+    );
+
+    return onSnapshot(
+      consulta,
+      (resultado) => {
+        setDoacoesFirestore(
+          resultado.docs.map(converterDoacao)
+        );
+        setErroFirestore("");
+      },
+      (erro) => {
+        console.error(
+          "Erro ao consultar Minhas doações:",
+          erro
+        );
+        setErroFirestore(
+          erro.code === "permission-denied"
+            ? "Não foi possível acessar suas doações. Tente novamente mais tarde."
+            : "Não foi possível carregar suas doações."
+        );
+      }
+    );
+  }, []);
 
   const doacoesFiltradas = useMemo(() => {
-    if (filtro === "Todas") return DOACOES_EXEMPLO;
+    const doacoes = [
+      ...doacoesFirestore,
+      ...DOACOES_EXEMPLO,
+    ];
+
+    if (filtro === "Todas") return doacoes;
     if (filtro === "Concluídas") {
-      return DOACOES_EXEMPLO.filter(
+      return doacoes.filter(
         (item) => item.status === "Concluída"
       );
     }
     if (filtro === "Em andamento") {
-      return DOACOES_EXEMPLO.filter(
+      return doacoes.filter(
         (item) => item.status === "Em andamento"
       );
     }
-    return DOACOES_EXEMPLO;
-  }, [filtro]);
+    return doacoes;
+  }, [filtro, doacoesFirestore]);
 
   function renderBotaoFiltro(label) {
     const ativo = filtro === label;
@@ -160,6 +339,12 @@ export default function TelaMinhasDoacoes({ navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+          {!!erroFirestore && (
+            <Text style={styles.erroFirestore}>
+              {erroFirestore}
+            </Text>
+          )}
+
           {doacoesFiltradas.map((item) => (
             <TouchableOpacity
               key={item.id}
@@ -172,11 +357,19 @@ export default function TelaMinhasDoacoes({ navigation }) {
               }
             >
               <View style={styles.cardEsquerda}>
-                <Image
-                  source={IMAGENS[item.tipoImagem]}
-                  style={styles.imagemProduto}
-                  resizeMode="contain"
-                />
+                {item.tipoImagem ? (
+                  <Image
+                    source={IMAGENS[item.tipoImagem]}
+                    style={styles.imagemProduto}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Ionicons
+                    name="nutrition-outline"
+                    size={42}
+                    color={VERDE}
+                  />
+                )}
               </View>
 
               <View style={styles.cardCentro}>
@@ -202,30 +395,9 @@ export default function TelaMinhasDoacoes({ navigation }) {
           ))}
         </ScrollView>
 
-        <View style={styles.tabBar}>
-          <ItemTab icone="home-outline" texto="Início" />
-          <ItemTab icone="search-outline" texto="Buscar" />
-          <ItemTab icone="calendar-outline" texto="Eventos" />
-          <ItemTab icone="heart-outline" texto="Doe Agora" />
-          <ItemTab icone="person-outline" texto="Perfil" ativo />
-        </View>
+        <MenuInferior navigation={navigation} ativo="doacoes" />
       </View>
     </SafeAreaView>
-  );
-}
-
-function ItemTab({ icone, texto, ativo = false }) {
-  return (
-    <TouchableOpacity style={styles.tabItem} activeOpacity={0.8}>
-      <Ionicons
-        name={icone}
-        size={21}
-        color={ativo ? VERDE : "#666"}
-      />
-      <Text style={[styles.tabTexto, ativo && styles.tabTextoAtivo]}>
-        {texto}
-      </Text>
-    </TouchableOpacity>
   );
 }
 
@@ -302,7 +474,13 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingHorizontal: 14,
-    paddingBottom: 110,
+    paddingBottom: 18,
+  },
+
+  erroFirestore: {
+    color: "#A12A2A",
+    fontSize: 13,
+    marginBottom: 12,
   },
 
   card: {
@@ -374,34 +552,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  tabBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#FAF9F5",
-    borderTopWidth: 1,
-    borderTopColor: "#D8DDD6",
-    paddingTop: 10,
-    paddingBottom: 14,
-  },
-
-  tabItem: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  tabTexto: {
-    fontSize: 10,
-    color: "#666",
-    marginTop: 3,
-    fontFamily: "Poppins_400Regular",
-  },
-
-  tabTextoAtivo: {
-    color: VERDE,
-    fontFamily: "Poppins_600SemiBold",
-  },
-});
+})

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 
 import {
@@ -7,7 +6,6 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -17,13 +15,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import { db } from "../firebaseDb";
 import { auth } from "../firebase";
 
 // =====================================
@@ -116,6 +107,46 @@ const RETIRADOS = [
   "iogurte",
 ];
 
+const IMAGENS_POR_PRODUTO = [
+  ["cesta basica", "cesta"],
+  ["grao-de-bico", "grao-de-bico"],
+  ["grao de bico", "grao-de-bico"],
+  ["sardinha em conserva", "sardinha"],
+  ["atum em conserva", "atum"],
+  ["extrato de tomate", "extrato-de-tomate"],
+  ["molho de tomate", "molho-de-tomate"],
+  ["arroz", "arroz"],
+  ["feijao", "feijao"],
+  ["macarrao", "macarrao"],
+  ["oleo", "oleo"],
+  ["acucar", "acucar"],
+  ["sal", "sal"],
+  ["farinha", "farinha"],
+  ["cafe", "cafe"],
+  ["biscoito", "biscoito"],
+  ["bolacha", "biscoito"],
+  ["leite", "leite"],
+  ["agua", "agua"],
+  ["tomate", "tomate"],
+  ["cenoura", "cenoura"],
+  ["alface", "alface"],
+  ["batata", "batatas"],
+  ["cebola", "cebolas"],
+  ["abobrinha", "abobrinhas"],
+  ["repolho", "repolhos"],
+  ["couve", "couve"],
+  ["brocolis", "brocolis"],
+  ["pepino", "pepinos"],
+  ["beterraba", "beterrabas"],
+  ["abobora", "aboboras"],
+  ["mandioca", "mandiocas"],
+  ["pimentao", "pimentoes"],
+  ["aveia", "aveia"],
+  ["fuba", "fuba"],
+  ["milho", "milho"],
+  ["lentilha", "lentilha"],
+];
+
 // =====================================
 // FUNÇÕES AUXILIARES
 // =====================================
@@ -135,6 +166,18 @@ function contemProduto(nome, lista) {
       nome.startsWith(item + " ") ||
       nome.startsWith(item + "-")
   );
+}
+
+function obterImagemChave(nome) {
+  const texto = normalizar(nome);
+  const correspondencia = IMAGENS_POR_PRODUTO.find(
+    ([produto]) =>
+      texto === produto ||
+      texto.startsWith(`${produto} `) ||
+      texto.startsWith(`${produto}-`)
+  );
+
+  return correspondencia?.[1] || "";
 }
 
 // VALIDAR ALIMENTOS DO CATÁLOGO
@@ -278,19 +321,14 @@ export default function TelaCadastrarDoacao({
   const [confirmou, setConfirmou] =
     useState(false);
 
-  const [salvando, setSalvando] =
-    useState(false);
-
   const [erro, setErro] =
     useState("");
 
   // =====================================
-  // SALVAR DOAÇÃO NO FIRESTORE
+  // ENVIAR DOAÇÃO PARA A TELA DE COBRANÇA
   // =====================================
 
-  async function salvar() {
-    if (salvando) return;
-
+  function salvar() {
     setErro("");
     Keyboard.dismiss();
 
@@ -408,70 +446,24 @@ export default function TelaCadastrarDoacao({
       return;
     }
 
-    setSalvando(true);
-
-    try {
-      await addDoc(
-        collection(db, "alimentos"),
-        {
-          nome: nomeLimpo,
-
-          estabelecimento:
-            estabelecimentoLimpo,
-
-          categoria,
-
-          quantidade:
-            quantidadeNumero,
-
-          unidade,
-
-          cidade: cidadeLimpa,
-
-          descricao:
-            descricaoLimpa,
-
-          validade:
-            validadeLimpa,
-
-          // DOAÇÃO GRATUITA
-          preco: "Gratuito",
-          precoAntigo: "",
-
-          // PREÇO OPCIONAL
-          precoReferencia: null,
-          precoUnidade: "",
-
-          // A HOME IDENTIFICA A IMAGEM
-          // PELO NOME DO ALIMENTO
-          imagemChave: "",
-
-          status: "disponivel",
-          demonstracao: false,
-
-          criadoPor:
-            usuario.uid,
-
-          criadoEm:
-            serverTimestamp(),
-        }
-      );
-
-      navigation.goBack();
-    } catch (erroFirebase) {
-      console.error(
-        "Erro ao cadastrar doação:",
-        erroFirebase
-      );
-
-      setErro(
-        erroFirebase.code === "permission-denied"
-          ? "Permissão negada. Confira as regras do Firestore."
-          : "Não foi possível salvar a doação."
-      );
-    } finally {
-      setSalvando(false);
-    }
+    navigation.navigate("DetalhesCobranca", {
+      doacao: {
+        nome: nomeLimpo,
+        estabelecimento: estabelecimentoLimpo,
+        categoria,
+        quantidade: quantidadeNumero,
+        unidade,
+        cidade: cidadeLimpa,
+        descricao: descricaoLimpa,
+        validade: validadeLimpa,
+        preco: "Gratuito",
+        precoAntigo: "",
+        precoReferencia: null,
+        precoUnidade: "",
+        imagemChave: obterImagemChave(nomeLimpo),
+        demonstracao: false,
+      },
+    });
   }
 
   // =====================================
@@ -671,17 +663,10 @@ export default function TelaCadastrarDoacao({
           <TouchableOpacity
             style={styles.salvar}
             onPress={salvar}
-            disabled={salvando}
           >
-            {salvando ? (
-              <ActivityIndicator
-                color="#FFFFFF"
-              />
-            ) : (
-              <Text style={styles.salvarTexto}>
-                Salvar doação no Firestore
-              </Text>
-            )}
+            <Text style={styles.salvarTexto}>
+              Salvar doação
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.observacao}>
@@ -842,4 +827,4 @@ const styles = StyleSheet.create({
     color: "#777777",
     lineHeight: 18,
   },
-});
+})

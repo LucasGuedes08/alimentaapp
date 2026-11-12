@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+
 import {
   View,
   Text,
@@ -6,18 +7,17 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import MenuInferior from "../components/MenuInferior";
+import { IMAGENS_CATALOGO } from "../assets/images/catalogo/mapa";
 
 const VERDE = "#006838";
-const VERDE_CHIP = "#BFD9AF";
-const FUNDO = "#F7F5EF";
-const BRANCO = "#FFFFFF";
-const CINZA = "#666C66";
+const FUNDO = "#FFFCF6";
 const BORDA = "#D8DDD6";
-const SOMBRA = "#000000";
-const AMARELO_STATUS = "#EFE7B4";
 
 const IMAGENS = {
   oleo: require("../assets/images/tabIcons/oleo.png"),
@@ -34,101 +34,156 @@ const IMAGENS = {
   tomate: require("../assets/images/tabIcons/tomate.png"),
   cenoura: require("../assets/images/tabIcons/cenoura.png"),
   alface: require("../assets/images/tabIcons/alface.png"),
+  ...IMAGENS_CATALOGO,
+};
+
+const DOACAO_PADRAO = {
+  nome: "Doação de alimentos",
+  instituicao: "Instituição beneficiada",
+  data: "Data não informada",
+  quantidade: 0,
+  unidade: "itens",
+  status: "Em andamento",
+  tipoImagem: null,
+  itens: [],
+  localRetirada: "A combinar",
+  descricao: "Acompanhe aqui as informações desta doação.",
+  instituicaoBeneficiada: {
+    nome: "Não informada",
+    cidade: "Suzano - SP",
+    descricao:
+      "A instituição beneficiada ainda não foi registrada nesta doação.",
+  },
 };
 
 export default function TelaDetalhesDoacao({ navigation, route }) {
+  const { width } = useWindowDimensions();
   const [mostrarItens, setMostrarItens] = useState(true);
 
-  const doacao = useMemo(() => {
-    if (route?.params?.doacao) return route.params.doacao;
-
-    return {
-      nome: "Óleo",
-      instituicao: "Mercado comunitário",
-      data: "29/10/2026",
-      quantidade: 2,
-      unidade: "unidades",
-      status: "Em andamento",
-      tipoImagem: "oleo",
-      itens: ["Óleo — 2 unidades"],
-      localRetirada: "Suzano - SP",
-      descricao: "Esta doação ainda está em andamento.",
+  const doacao = useMemo(
+    () => ({
+      ...DOACAO_PADRAO,
+      ...(route?.params?.doacao || {}),
       instituicaoBeneficiada: {
-        nome: "Não informada",
-        cidade: "Suzano - SP",
-        descricao:
-          "A instituição beneficiada ainda não foi registrada nesta doação.",
+        ...DOACAO_PADRAO.instituicaoBeneficiada,
+        ...(route?.params?.doacao?.instituicaoBeneficiada || {}),
       },
-    };
-  }, [route]);
+    }),
+    [route?.params?.doacao]
+  );
+
+  const imagem = IMAGENS[doacao.tipoImagem];
+  const itens = Array.isArray(doacao.itens) ? doacao.itens : [];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <View style={styles.container}>
+      <View style={[styles.tela, { width: Math.min(width, 460) }]}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={styles.conteudo}
         >
-          <View style={styles.topoImagem}>
-            <Image
-              source={IMAGENS[doacao.tipoImagem]}
-              style={styles.imagemTopo}
-              resizeMode="cover"
-            />
-
+          <View style={styles.topo}>
             <TouchableOpacity
-              style={styles.botaoVoltar}
-              onPress={() => navigation.goBack()}
+              style={styles.voltar}
+              onPress={() =>
+                navigation.canGoBack()
+                  ? navigation.goBack()
+                  : navigation.navigate("TelaMinhasDoacoes")
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para minhas doações"
             >
               <Ionicons name="chevron-back" size={22} color={VERDE} />
             </TouchableOpacity>
+
+            <Text style={styles.titulo}>Detalhes da doação</Text>
           </View>
 
-          <View style={styles.cardPrincipal}>
-            <View style={styles.chipCategoria}>
-              <Text style={styles.chipCategoriaTexto}>DOAÇÃO</Text>
-            </View>
+          <Text style={styles.subtitulo}>
+            Acompanhe todas as informações
+          </Text>
 
-            <Text style={styles.titulo}>{doacao.nome}</Text>
-            <Text style={styles.subtitulo}>{doacao.instituicao}</Text>
+          <View style={styles.cardDoacao}>
+            {imagem ? (
+              <Image
+                source={imagem}
+                style={styles.imagem}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.imagem, styles.imagemVazia]}>
+                <Ionicons
+                  name="nutrition-outline"
+                  size={39}
+                  color={VERDE}
+                />
+              </View>
+            )}
 
-            <View style={styles.linhaPreco}>
-              <Text style={styles.textoDestaque}>
+            <View style={styles.dadosDoacao}>
+              <Text style={styles.nomeDoacao} numberOfLines={2}>
+                {doacao.nome}
+              </Text>
+              <Text style={styles.instituicao} numberOfLines={1}>
+                {doacao.instituicao}
+              </Text>
+              <Text style={styles.meta}>
                 {doacao.data} • {doacao.quantidade} {doacao.unidade}
               </Text>
+              <View style={styles.status}>
+                <Text style={styles.statusTexto}>{doacao.status}</Text>
+              </View>
             </View>
-
-            <View style={styles.statusWrap}>
-              <Text style={styles.statusTexto}>{doacao.status}</Text>
-            </View>
-
-            <View style={styles.divisor} />
-
-            <Text style={styles.retirada}>
-              Local de retirada: {doacao.localRetirada}
-            </Text>
           </View>
 
-          <Text style={styles.secaoTitulo}>Sobre a doação</Text>
-          <Text style={styles.secaoTexto}>{doacao.descricao}</Text>
+          <View style={styles.resumo}>
+            <View style={styles.resumoItem}>
+              <Text style={styles.resumoTitulo}>Data da doação</Text>
+              <Text style={styles.resumoValor}>{doacao.data}</Text>
+            </View>
+            <View style={styles.resumoItem}>
+              <Text style={styles.resumoTitulo}>Itens doados</Text>
+              <Text style={styles.resumoValor}>
+                {doacao.quantidade} {doacao.unidade}
+              </Text>
+            </View>
+            <View style={[styles.resumoItem, styles.resumoUltimo]}>
+              <Text style={styles.resumoTitulo}>Local de retirada</Text>
+              <Text style={styles.resumoValor} numberOfLines={2}>
+                {doacao.localRetirada}
+              </Text>
+            </View>
+          </View>
 
-          <Text style={styles.secaoTitulo}>Instituição beneficiada</Text>
+          {doacao.tipoDoacao === "agrupada" && (
+            <View style={styles.totalDoacao}>
+              <Text style={styles.totalDoacaoRotulo}>
+                Total demonstrativo
+              </Text>
+              <Text style={styles.totalDoacaoValor}>
+                R$ {Number(doacao.total || 0).toFixed(2).replace(".", ",")}
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.secao}>Instituição beneficiada</Text>
+          <Text style={styles.secaoDescricao}>
+            Conheça mais sobre a instituição que recebeu sua doação.
+          </Text>
 
           <View style={styles.cardInstituicao}>
             <View style={styles.iconeInstituicao}>
-              <Ionicons name="business-outline" size={28} color={VERDE} />
+              <Ionicons name="business-outline" size={31} color={VERDE} />
             </View>
-
-            <View style={{ flex: 1 }}>
+            <View style={styles.dadosInstituicao}>
               <Text style={styles.nomeInstituicao}>
-                {doacao.instituicaoBeneficiada?.nome || "Não informada"}
+                {doacao.instituicaoBeneficiada.nome}
               </Text>
-              <Text style={styles.cidadeInstituicao}>
-                {doacao.instituicaoBeneficiada?.cidade || "Suzano - SP"}
+              <Text style={styles.cidade}>
+                {doacao.instituicaoBeneficiada.cidade}
               </Text>
-              <Text style={styles.descInstituicao}>
-                {doacao.instituicaoBeneficiada?.descricao ||
-                  "A instituição beneficiada ainda não foi registrada nesta doação."}
+              <Text style={styles.descricaoInstituicao}>
+                {doacao.instituicaoBeneficiada.descricao}
               </Text>
             </View>
           </View>
@@ -137,8 +192,10 @@ export default function TelaDetalhesDoacao({ navigation, route }) {
             style={styles.botaoItens}
             onPress={() => setMostrarItens(!mostrarItens)}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: mostrarItens }}
           >
-            <Text style={styles.botaoItensTexto}>Itens da doação</Text>
+            <Text style={styles.botaoItensTexto}>Itens doados</Text>
             <Ionicons
               name={mostrarItens ? "chevron-up" : "chevron-down"}
               size={20}
@@ -148,46 +205,30 @@ export default function TelaDetalhesDoacao({ navigation, route }) {
 
           {mostrarItens && (
             <View style={styles.listaItens}>
-              {doacao.itens?.map((item, index) => (
-                <Text key={index} style={styles.itemTexto}>
-                  • {item}
+              {itens.length > 0 ? (
+                itens.map((item, index) => (
+                  <Text key={`${index}-${item}`} style={styles.itemTexto}>
+                    • {item}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.itemTexto}>
+                  Os itens desta doação ainda não foram informados.
                 </Text>
-              ))}
+              )}
             </View>
           )}
 
-          <View style={styles.cardInformacao}>
-            <Text style={styles.infoTexto}>
-              Acompanhe o andamento desta doação. A entrega só será
-              considerada concluída após atualização do status.
+          <View style={styles.aviso}>
+            <Text style={styles.avisoTexto}>
+              {doacao.descricao}
             </Text>
           </View>
         </ScrollView>
 
-        <View style={styles.tabBar}>
-          <ItemTab icone="home-outline" texto="Início" />
-          <ItemTab icone="search-outline" texto="Buscar" />
-          <ItemTab icone="calendar-outline" texto="Eventos" />
-          <ItemTab icone="heart-outline" texto="Doe Agora" />
-          <ItemTab icone="person-outline" texto="Perfil" ativo />
-        </View>
+        <MenuInferior navigation={navigation} ativo="doacoes" />
       </View>
     </SafeAreaView>
-  );
-}
-
-function ItemTab({ icone, texto, ativo = false }) {
-  return (
-    <TouchableOpacity style={styles.tabItem} activeOpacity={0.8}>
-      <Ionicons
-        name={icone}
-        size={21}
-        color={ativo ? VERDE : "#666"}
-      />
-      <Text style={[styles.tabTexto, ativo && styles.tabTextoAtivo]}>
-        {texto}
-      </Text>
-    </TouchableOpacity>
   );
 }
 
@@ -195,265 +236,263 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: FUNDO,
+    alignItems: "center",
   },
-
-  container: {
+  tela: {
     flex: 1,
+    maxWidth: 460,
     backgroundColor: FUNDO,
   },
-
-  scroll: {
-    paddingBottom: 110,
+  conteudo: {
+    padding: 14,
+    paddingBottom: 18,
   },
-
-  topoImagem: {
-    height: 250,
-    backgroundColor: "#EDE6DB",
-    position: "relative",
+  topo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-
-  imagemTopo: {
-    width: "100%",
-    height: "100%",
-  },
-
-  botaoVoltar: {
-    position: "absolute",
-    top: 18,
-    left: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(247,245,239,0.95)",
+  voltar: {
+    width: 36,
+    height: 36,
+    borderRadius: 20,
+    backgroundColor: "#E6F0DF",
     alignItems: "center",
     justifyContent: "center",
   },
-
-  cardPrincipal: {
-    marginTop: -28,
-    marginHorizontal: 18,
-    backgroundColor: BRANCO,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#D4D8D1",
-    padding: 16,
-    shadowColor: SOMBRA,
-    shadowOpacity: 0.12,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-
-  chipCategoria: {
-    alignSelf: "flex-start",
-    backgroundColor: VERDE_CHIP,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    marginBottom: 12,
-  },
-
-  chipCategoriaTexto: {
-    color: VERDE,
-    fontSize: 12,
-    fontFamily: "Poppins_700Bold",
-  },
-
   titulo: {
-    color: "#20261F",
-    fontSize: 31,
-    lineHeight: 38,
-    fontFamily: "Poppins_700Bold",
-  },
-
-  subtitulo: {
-    color: CINZA,
-    fontSize: 20,
-    marginTop: 2,
-    fontFamily: "Poppins_500Medium",
-  },
-
-  linhaPreco: {
-    marginTop: 10,
-    marginBottom: 8,
-  },
-
-  textoDestaque: {
     color: VERDE,
-    fontSize: 23,
     fontFamily: "Poppins_700Bold",
-  },
-
-  statusWrap: {
-    alignSelf: "flex-start",
-    backgroundColor: AMARELO_STATUS,
-    borderRadius: 7,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    marginTop: 4,
-  },
-
-  statusTexto: {
-    color: "#5B6A35",
-    fontSize: 12,
-    fontFamily: "Poppins_600SemiBold",
-  },
-
-  divisor: {
-    height: 1,
-    backgroundColor: "#D9D9D9",
-    marginVertical: 14,
-  },
-
-  retirada: {
-    color: "#5C615C",
-    fontSize: 16,
-    fontFamily: "Poppins_500Medium",
-  },
-
-  secaoTitulo: {
-    marginTop: 18,
-    marginHorizontal: 18,
-    color: "#1A1F19",
-    fontSize: 30,
-    lineHeight: 34,
-    fontFamily: "Poppins_700Bold",
-  },
-
-  secaoTexto: {
-    marginTop: 6,
-    marginHorizontal: 18,
-    color: "#555D55",
     fontSize: 19,
-    lineHeight: 29,
-    fontFamily: "Poppins_400Regular",
   },
-
+  subtitulo: {
+    color: "#686868",
+    fontFamily: "Poppins_500Medium",
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  cardDoacao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 9,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: BORDA,
+    backgroundColor: "#FFFFFF",
+    elevation: 3,
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  imagem: {
+    width: 91,
+    height: 83,
+    borderRadius: 11,
+    backgroundColor: "#F1F1EC",
+  },
+  imagemVazia: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dadosDoacao: {
+    flex: 1,
+    minWidth: 0,
+  },
+  nomeDoacao: {
+    color: VERDE,
+    fontFamily: "Poppins_700Bold",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  instituicao: {
+    color: "#5B5B5B",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 10,
+    marginTop: 1,
+  },
+  meta: {
+    color: VERDE,
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 10,
+    marginTop: 2,
+  },
+  status: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: "#BFD9AF",
+    marginTop: 5,
+  },
+  statusTexto: {
+    color: VERDE,
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 9,
+  },
+  resumo: {
+    flexDirection: "row",
+    marginTop: 10,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: BORDA,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
+    elevation: 2,
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  totalDoacao: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#EAF2E5",
+  },
+  totalDoacaoRotulo: {
+    color: "#4D5C4D",
+    fontFamily: "Poppins_500Medium",
+    fontSize: 11,
+  },
+  totalDoacaoValor: {
+    color: VERDE,
+    fontFamily: "Poppins_700Bold",
+    fontSize: 13,
+  },
+  resumoItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    borderRightWidth: 1,
+    borderRightColor: "#E0E0E0",
+  },
+  resumoUltimo: {
+    borderRightWidth: 0,
+  },
+  resumoTitulo: {
+    color: "#606060",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 9,
+    textAlign: "center",
+  },
+  resumoValor: {
+    color: VERDE,
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  secao: {
+    color: VERDE,
+    fontFamily: "Poppins_700Bold",
+    fontSize: 15,
+    marginTop: 16,
+  },
+  secaoDescricao: {
+    color: "#777777",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 10,
+    marginTop: 1,
+  },
   cardInstituicao: {
     flexDirection: "row",
-    gap: 14,
-    marginTop: 12,
-    marginHorizontal: 18,
-    backgroundColor: BRANCO,
-    borderRadius: 16,
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 13,
     borderWidth: 1,
     borderColor: BORDA,
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    elevation: 2,
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
-
   iconeInstituicao: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    backgroundColor: "#EEF6E8",
+    width: 58,
+    height: 58,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#EEF4E5",
   },
-
+  dadosInstituicao: {
+    flex: 1,
+  },
   nomeInstituicao: {
     color: VERDE,
-    fontSize: 19,
     fontFamily: "Poppins_700Bold",
+    fontSize: 10,
   },
-
-  cidadeInstituicao: {
-    color: "#404840",
-    fontSize: 16,
+  cidade: {
+    color: "#303030",
+    fontFamily: "Poppins_500Medium",
+    fontSize: 9,
     marginTop: 1,
-    fontFamily: "Poppins_500Medium",
   },
-
-  descInstituicao: {
-    color: "#666E66",
-    fontSize: 15,
-    lineHeight: 24,
-    marginTop: 6,
+  descricaoInstituicao: {
+    color: "#6A6A6A",
     fontFamily: "Poppins_400Regular",
+    fontSize: 9,
+    lineHeight: 13,
+    marginTop: 3,
   },
-
   botaoItens: {
-    marginTop: 18,
-    marginHorizontal: 18,
-    backgroundColor: "#D9E9CE",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#B9D1AA",
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    minHeight: 35,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  botaoItensTexto: {
-    color: VERDE,
-    fontSize: 20,
-    fontFamily: "Poppins_700Bold",
-  },
-
-  listaItens: {
-    marginTop: 10,
-    marginHorizontal: 18,
-    backgroundColor: BRANCO,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDA,
-    padding: 16,
-  },
-
-  itemTexto: {
-    color: "#444B44",
-    fontSize: 17,
-    lineHeight: 27,
-    fontFamily: "Poppins_500Medium",
-  },
-
-  cardInformacao: {
-    marginTop: 16,
-    marginHorizontal: 18,
-    backgroundColor: "#F7F7F4",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDA,
-    padding: 16,
-  },
-
-  infoTexto: {
-    textAlign: "center",
-    color: "#666B66",
-    fontSize: 15,
-    lineHeight: 24,
-    fontFamily: "Poppins_400Regular",
-  },
-
-  tabBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#FAF9F5",
-    borderTopWidth: 1,
-    borderTopColor: "#D8DDD6",
-    paddingTop: 10,
-    paddingBottom: 14,
-  },
-
-  tabItem: {
     alignItems: "center",
     justifyContent: "center",
+    gap: 5,
+    marginTop: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#C9D8BF",
+    backgroundColor: "#E8EFDF",
+    elevation: 2,
   },
-
-  tabTexto: {
-    fontSize: 10,
-    color: "#666",
-    marginTop: 3,
-    fontFamily: "Poppins_400Regular",
-  },
-
-  tabTextoAtivo: {
+  botaoItensTexto: {
     color: VERDE,
     fontFamily: "Poppins_600SemiBold",
+    fontSize: 13,
+  },
+  listaItens: {
+    padding: 11,
+    marginTop: 7,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: BORDA,
+    backgroundColor: "#FFFFFF",
+  },
+  itemTexto: {
+    color: "#666666",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  aviso: {
+    padding: 10,
+    marginTop: 8,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: BORDA,
+    backgroundColor: "#FFFFFF",
+  },
+  avisoTexto: {
+    color: "#666666",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 9,
+    lineHeight: 14,
+    textAlign: "center",
   },
 });
