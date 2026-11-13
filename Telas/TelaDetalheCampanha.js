@@ -8,15 +8,27 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
-  Alert,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { imagemCampanha } from "../utils/campanhasAdmin";
 
 const VERDE = "#006838";
-const LARANJA = "#FF7827";
 const FUNDO = "#FFFCF6";
+
+function formatarMeta(valor) {
+  const numero = Number(valor);
+
+  if (!Number.isFinite(numero) || numero <= 0) {
+    return "";
+  }
+
+  return numero.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
 
 export default function TelaDetalheCampanha({
   navigation,
@@ -25,20 +37,14 @@ export default function TelaDetalheCampanha({
   const { width } = useWindowDimensions();
   const campanha = route?.params?.campanha;
   const ativa = campanha?.status === "Ativa";
-  const percentual = campanha?.percentual;
+  const meta = formatarMeta(campanha?.meta);
+  const responsavel =
+    campanha?.responsavel ||
+    campanha?.organizacao ||
+    campanha?.estabelecimento;
 
   function contribuir() {
-    Alert.alert(
-      "Campanha demonstrativa",
-      "Esta prévia não recebe contribuições reais. Você pode cadastrar uma doação de alimento separadamente.",
-      [
-        { text: "Agora não", style: "cancel" },
-        {
-          text: "Cadastrar alimento",
-          onPress: () => navigation.navigate("TelaCadastrarDoacao"),
-        },
-      ]
-    );
+    navigation.navigate("Home", { abrirAba: "buscar" });
   }
 
   return (
@@ -48,9 +54,9 @@ export default function TelaDetalheCampanha({
           contentContainerStyle={styles.conteudo}
           showsVerticalScrollIndicator={false}
         >
-          {campanha?.imagem ? (
+          {campanha?.imagemChave ? (
             <Image
-              source={campanha.imagem}
+              source={imagemCampanha(campanha)}
               resizeMode="cover"
               style={styles.imagem}
             />
@@ -88,34 +94,37 @@ export default function TelaDetalheCampanha({
                   <Text style={styles.prazo}>{campanha.prazo}</Text>
                 )}
 
-                {!!campanha.metaTexto && (
+                {!!campanha.categoria && (
+                  <Text style={styles.informacao}>
+                    Categoria: {campanha.categoria}
+                  </Text>
+                )}
+
+                {!!campanha.inicio && (
+                  <Text style={styles.informacao}>
+                    Início: {campanha.inicio}
+                  </Text>
+                )}
+
+                {!!campanha.termino && (
+                  <Text style={styles.informacao}>
+                    Término: {campanha.termino}
+                  </Text>
+                )}
+
+                {!!responsavel && (
+                  <Text style={styles.informacao}>
+                    Responsável: {responsavel}
+                  </Text>
+                )}
+
+                {!!meta && (
                   <View style={styles.meta}>
-                    <View style={styles.metaTopo}>
-                      <Text style={styles.metaTitulo}>
-                        Meta da campanha
-                      </Text>
-                      <Text style={styles.percentual}>
-                        {percentual}%
-                      </Text>
-                    </View>
-                    <View
-                      accessibilityRole="progressbar"
-                      accessibilityValue={{
-                        min: 0,
-                        max: 100,
-                        now: percentual,
-                      }}
-                      style={styles.trilho}
-                    >
-                      <View
-                        style={[
-                          styles.progresso,
-                          { width: `${percentual}%` },
-                        ]}
-                      />
-                    </View>
+                    <Text style={styles.metaTitulo}>
+                      Meta da campanha
+                    </Text>
                     <Text style={styles.metaTexto}>
-                      {campanha.metaTexto}
+                      {meta}
                     </Text>
                   </View>
                 )}
@@ -124,8 +133,8 @@ export default function TelaDetalheCampanha({
           </View>
 
           <Text style={styles.aviso}>
-            Prévia para demonstração. As informações de campanha não
-            estão conectadas a uma arrecadação real.
+            Escolha alimentos do catálogo para adicionar ao seu carrinho
+            de doações.
           </Text>
 
           {campanha && (
@@ -136,7 +145,7 @@ export default function TelaDetalheCampanha({
               accessibilityRole="button"
             >
               <Text style={styles.botaoTexto}>
-                {ativa ? "Quero contribuir" : "Campanha indisponível"}
+                {ativa ? "Escolher alimentos" : "Campanha indisponível"}
               </Text>
             </TouchableOpacity>
           )}
@@ -158,7 +167,7 @@ const styles = StyleSheet.create({
   },
   conteudo: {
     flexGrow: 1,
-    paddingBottom: 30,
+    paddingBottom: 92,
   },
   imagem: {
     width: "100%",
@@ -211,6 +220,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 9,
   },
+  informacao: {
+    color: "#686868",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 13,
+    marginTop: 6,
+  },
   meta: {
     marginTop: 10,
     padding: 10,
@@ -219,34 +234,10 @@ const styles = StyleSheet.create({
     borderColor: "#CFD8C6",
     backgroundColor: "#EEF4E5",
   },
-  metaTopo: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
   metaTitulo: {
     color: "#686868",
     fontFamily: "Poppins_400Regular",
     fontSize: 14,
-  },
-  percentual: {
-    color: VERDE,
-    fontFamily: "Poppins_700Bold",
-    fontSize: 17,
-  },
-  trilho: {
-    height: 15,
-    borderRadius: 10,
-    backgroundColor: "#D8D8D8",
-    overflow: "hidden",
-    marginTop: 3,
-  },
-  progresso: {
-    width: "70%",
-    height: "100%",
-    borderRadius: 10,
-    backgroundColor: LARANJA,
   },
   metaTexto: {
     color: "#686868",
@@ -266,11 +257,11 @@ const styles = StyleSheet.create({
   botao: {
     minHeight: 46,
     marginHorizontal: 28,
-    marginTop: 48,
+    marginTop: 24,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: LARANJA,
+    backgroundColor: VERDE,
     elevation: 3,
   },
   botaoDesativado: {

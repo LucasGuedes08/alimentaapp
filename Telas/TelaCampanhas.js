@@ -4,6 +4,7 @@ import React, {
 } from "react";
 
 import {
+  ActivityIndicator,
   View,
   Text,
   Image,
@@ -16,58 +17,12 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebaseDb";
+import { imagemCampanha, textoNormalizado } from "../utils/campanhasAdmin";
 
 const VERDE = "#006838";
 const FUNDO = "#FFFCF6";
-
-// EXEMPLOS VISUAIS PARA O TCC.
-// NÃO ESTÃO CADASTRADOS NO FIRESTORE.
-// UTILIZAM IMAGENS EXISTENTES NO PROJETO.
-const CAMPANHAS = [
-  {
-    id: "cesta",
-    nome: "Cesta Básica Solidária",
-    descricao:
-      "Doação de cestas básicas para famílias de baixa renda.",
-    status: "Ativa",
-    prazo: "Até 30 de dezembro",
-    percentual: 70,
-    metaTexto: "700 de 1000 cestas",
-    imagem: require(
-      "../assets/images/tabIcons/cesta-basica.png"
-    ),
-  },
-  {
-    id: "inverno",
-    nome: "Inverno sem Fome",
-    descricao:
-      "Arrecadação de alimentos para o período de inverno.",
-    status: "Pausada",
-    imagem: require(
-      "../assets/images/tabIcons/agua.jpg"
-    ),
-  },
-  {
-    id: "rede",
-    nome: "Rede de Alimentos",
-    descricao:
-      "Combate ao desperdício e redistribuição de alimentos.",
-    status: "Ativa",
-    imagem: require(
-      "../assets/images/tabIcons/alface.png"
-    ),
-  },
-  {
-    id: "cafe",
-    nome: "Café da manhã Solidário",
-    descricao:
-      "Apoio alimentar a famílias e comunidades.",
-    status: "Encerrada",
-    imagem: require(
-      "../assets/images/tabIcons/cafe.png"
-    ),
-  },
-];
 
 export default function TelaCampanhas({
   navigation,
@@ -76,29 +31,50 @@ export default function TelaCampanhas({
 
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("Todas");
+  const [campanhas, setCampanhas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState("");
 
   const [
     filtrosAbertos,
     setFiltrosAbertos,
   ] = useState(false);
 
+  React.useEffect(() => {
+    return onSnapshot(
+      collection(db, "campanhas"),
+      (snapshot) => {
+        setCampanhas(
+          snapshot.docs
+            .map((documento) => ({
+              id: documento.id,
+              ...documento.data(),
+            }))
+            .filter((campanha) => campanha.exemplo !== true)
+        );
+        setCarregando(false);
+        setErro("");
+      },
+      (falha) => {
+        console.error("Erro ao consultar campanhas:", falha);
+        setErro(
+          falha.code === "permission-denied"
+            ? "Você não tem permissão para visualizar campanhas."
+            : "Não foi possível carregar as campanhas."
+        );
+        setCarregando(false);
+      }
+    );
+  }, []);
+
   // FILTRAR CAMPANHAS
   const lista = useMemo(
     () =>
-      CAMPANHAS.filter((campanha) => {
-        const texto = [
-          campanha.nome,
-          campanha.descricao,
-        ]
-          .join(" ")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase();
-
-        const pesquisa = busca
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase();
+      campanhas.filter((campanha) => {
+        const texto = textoNormalizado(
+          `${campanha.nome || ""} ${campanha.descricao || ""}`
+        );
+        const pesquisa = textoNormalizado(busca);
 
         return (
           texto.includes(pesquisa) &&
@@ -108,7 +84,7 @@ export default function TelaCampanhas({
           )
         );
       }),
-    [busca, filtro]
+    [busca, filtro, campanhas]
   );
 
   return (
@@ -150,9 +126,9 @@ export default function TelaCampanhas({
           </View>
 
           <Text style={styles.subtitulo}>
-            Gerencie todas as campanhas
+            Conheça as campanhas disponíveis
             {"\n"}
-            cadastradas.
+            e escolha como contribuir.
           </Text>
 
           {/* PESQUISA E FILTROS */}
@@ -228,21 +204,29 @@ export default function TelaCampanhas({
             </View>
           )}
 
-          <Text style={styles.demo}>
-            Prévia de campanhas para demonstração
-            do TCC. As informações podem ser
-            atualizadas pela equipe responsável.
-          </Text>
-
           {/* LISTA DE CAMPANHAS */}
           <View style={styles.lista}>
-            {lista.length === 0 && (
+            {carregando && (
+              <ActivityIndicator
+                size="large"
+                color={VERDE}
+                style={{ marginTop: 24 }}
+              />
+            )}
+
+            {!!erro && (
+              <Text style={styles.vazio}>{erro}</Text>
+            )}
+
+            {!carregando && !erro && lista.length === 0 && (
               <Text style={styles.vazio}>
-                Nenhuma campanha encontrada.
+                {campanhas.length === 0
+                  ? "Ainda não há campanhas disponíveis."
+                  : "Nenhuma campanha encontrada."}
               </Text>
             )}
 
-            {lista.map((campanha) => (
+            {!carregando && !erro && lista.map((campanha) => (
               <TouchableOpacity
                 key={campanha.id}
                 style={styles.card}
@@ -253,11 +237,17 @@ export default function TelaCampanhas({
                 }
                 activeOpacity={0.85}
               >
-                <Image
-                  source={campanha.imagem}
-                  resizeMode="contain"
-                  style={styles.imagem}
-                />
+                {campanha.imagemChave ? (
+                  <Image
+                    source={imagemCampanha(campanha)}
+                    resizeMode="contain"
+                    style={styles.imagem}
+                  />
+                ) : (
+                  <View style={[styles.imagem, styles.imagemVazia]}>
+                    <Ionicons name="heart-outline" size={30} color={VERDE} />
+                  </View>
+                )}
 
                 <View style={styles.cardDados}>
                   <Text
@@ -334,7 +324,7 @@ const styles = StyleSheet.create({
 
   conteudo: {
     padding: 19,
-    paddingBottom: 24,
+    paddingBottom: 92,
   },
 
   topo: {
@@ -424,13 +414,6 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 
-  demo: {
-    fontSize: 11,
-    color: "#848484",
-    marginTop: 13,
-    lineHeight: 17,
-  },
-
   lista: {
     marginTop: 20,
     gap: 15,
@@ -454,6 +437,11 @@ const styles = StyleSheet.create({
     height: 91,
     borderRadius: 9,
     backgroundColor: "#F4F4EF",
+  },
+
+  imagemVazia: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   cardDados: {

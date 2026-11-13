@@ -263,14 +263,14 @@ service cloud.firestore {
     match /alimentos/{alimentoId} {
       allow read: if logado();
 
-      allow create: if logado()
+      allow create: if administrador()
         && valido(request.resource.data);
 
       allow update: if logado()
         && (
           (
-            resource.data.demonstracao == true
-            && resource.data.criadoPor == request.auth.uid
+            administrador()
+            && resource.data.demonstracao == true
             && request.resource.data.diff(
               resource.data
             ).affectedKeys().hasOnly([
@@ -316,8 +316,7 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if logado()
-        && resource.data.criadoPor == request.auth.uid;
+      allow delete: if administrador();
     }
 
     // ===================================

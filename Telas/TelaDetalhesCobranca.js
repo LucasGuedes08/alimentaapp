@@ -127,7 +127,7 @@ export default function TelaDetalhesCobranca({ navigation, route }) {
             disabled={!podeContinuar}
             accessibilityRole="button"
           >
-            <Text style={styles.botaoTexto}>Continuar para pagamento</Text>
+            <Text style={styles.botaoTexto}>Continuar</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

@@ -38,6 +38,13 @@ Para produção com inventário de alto valor, mova a finalização para uma Clo
 
 ## Publicação das regras
 
+As regras de `alimentos` permitem leitura aos usuários autenticados, mas
+reservam criação, exclusão e alteração de preços dos produtos a contas com a
+custom claim `admin: true`. Clientes continuam podendo adicionar itens ao
+carrinho e, ao concluir uma doação, baixar o estoque somente quando a alteração
+está vinculada à doação criada na mesma transação. Não atribua a claim pelo
+aplicativo cliente.
+
 1. Revise `firestore.rules` neste projeto Firebase.
 2. Publique o arquivo pelo Firebase Console (Firestore Database → Regras). A CLI também pode ser usada com `firebase deploy --only firestore:rules` quando o projeto tiver `firebase.json` configurado.
 3. Teste com duas sessões: esgote o mesmo produto simultaneamente e confirme que apenas uma finalização vence; confira a doação agrupada em “Minhas doações” e a lista vazia do carrinho.

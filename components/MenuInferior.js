@@ -29,7 +29,7 @@ export default function MenuInferior({
     }
 
     if (id === "doar") {
-      navigation.navigate("TelaCadastrarDoacao");
+      navigation.navigate("TelaCampanhas");
     } else if (id === "eventos") {
       navigation.navigate("TelaEventos");
     } else if (id === "perfil") {

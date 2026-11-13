@@ -32,13 +32,9 @@ import {
 
 import {
   collection,
-  doc,
-  getDoc,
   limit,
   onSnapshot,
   query,
-  serverTimestamp,
-  writeBatch,
 } from "firebase/firestore";
 
 import { auth } from "../firebase";
@@ -108,38 +104,6 @@ const CATEGORIAS = [
   "Mercearia",
   "Hortifruti",
   "Bebidas",
-];
-
-// ========================================
-// MENU INFERIOR
-// ========================================
-
-const ABAS = [
-  {
-    id: "inicio",
-    nome: "Início",
-    icone: "home-outline",
-  },
-  {
-    id: "buscar",
-    nome: "Buscar",
-    icone: "search-outline",
-  },
-  {
-    id: "eventos",
-    nome: "Eventos",
-    icone: "map-outline",
-  },
-  {
-    id: "doar",
-    nome: "Doe Agora",
-    icone: "heart-outline",
-  },
-  {
-    id: "perfil",
-    nome: "Perfil",
-    icone: "person-outline",
-  },
 ];
 
 // ========================================
@@ -928,20 +892,11 @@ export default function TelaHome({ navigation, route }) {
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState("");
 
-  // EXEMPLOS E AVISOS
-  const [
-    processandoExemplos,
-    setProcessandoExemplos,
-  ] = useState(false);
-
-  const [aviso, setAviso] = useState("");
-
   // PESQUISA
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("Todas");
 
   // NAVEGAÇÃO E MODAIS
-  const [abaAtiva, setAbaAtiva] = useState("inicio");
   const [modal, setModal] = useState(null);
 
   const [
@@ -1015,58 +970,6 @@ export default function TelaHome({ navigation, route }) {
   }, []);
 
   // ========================================
-  // VERIFICAR EXEMPLOS CADASTRADOS
-  // ========================================
-
-  const exemplosExistentes = alimentos.filter(
-    (produto) =>
-      produto.demonstracao === true &&
-      EXEMPLOS.some(
-        (item) => produto.id === `demo-${item.id}`
-      )
-  );
-
-  const todosExemplosInseridos = EXEMPLOS.every(
-    (item) =>
-      exemplosExistentes.some(
-        (produto) =>
-          produto.id === `demo-${item.id}`
-      )
-  );
-
-  // ========================================
-  // VERIFICAR PREÇOS DESATUALIZADOS
-  // ========================================
-
-  const temPrecosParaAtualizar =
-    exemplosExistentes.some((produto) => {
-      if (produto.criadoPor !== usuario?.uid) {
-        return false;
-      }
-
-      const referencia = EXEMPLOS.find(
-        (item) =>
-          produto.id === `demo-${item.id}`
-      );
-
-      return (
-        Boolean(referencia) &&
-        (
-          produto.precoAtual !==
-            calcularPrecoPromocional(referencia.precoReferencia) ||
-          produto.preco !==
-            moeda(calcularPrecoPromocional(referencia.precoReferencia)) ||
-          produto.precoAntigo !==
-            moeda(referencia.precoReferencia) ||
-          produto.precoReferencia !==
-            referencia.precoReferencia ||
-          produto.precoUnidade !==
-            referencia.precoUnidade
-        )
-      );
-    });
-
-  // ========================================
   // FILTRAR PESQUISA E CATEGORIAS
   // ========================================
 
@@ -1112,216 +1015,10 @@ export default function TelaHome({ navigation, route }) {
   }, [alimentos, categoria, busca]);
 
   // ========================================
-  // INSERIR OS EXEMPLOS NO FIRESTORE
-  // ========================================
-
-  async function inserirExemplos() {
-    if (processandoExemplos) return;
-
-    const atual = auth.currentUser;
-
-    if (!atual) {
-      setAviso("Faça login para inserir exemplos.");
-      return;
-    }
-
-    setProcessandoExemplos(true);
-    setAviso("");
-
-    try {
-      const verificacoes = await Promise.all(
-        EXEMPLOS.map(async (item) => {
-          const referencia = doc(
-            db,
-            "alimentos",
-            `demo-${item.id}`
-          );
-
-          const documento = await getDoc(referencia);
-
-          return {
-            item,
-            referencia,
-            existe: documento.exists(),
-          };
-        })
-      );
-
-      // NÃO DUPLICAR DOCUMENTOS EXISTENTES
-      const pendentes = verificacoes.filter(
-        (item) => !item.existe
-      );
-
-      if (pendentes.length === 0) {
-        setAviso(
-          "Todos os alimentos de demonstração já estão cadastrados."
-        );
-        return;
-      }
-
-      const lote = writeBatch(db);
-
-      pendentes.forEach(({ item, referencia }) => {
-        const precoAtual = calcularPrecoPromocional(
-          item.precoReferencia
-        );
-
-        lote.set(referencia, {
-          nome: item.nome,
-          estabelecimento: item.estabelecimento,
-          categoria: item.categoria,
-
-          quantidade: item.quantidade,
-          unidade: item.unidade,
-          cidade: "Suzano - SP",
-
-          descricao: item.descricao,
-          validade: "",
-
-          preco: moeda(precoAtual),
-          precoAtual,
-          precoAntigo: moeda(item.precoReferencia),
-
-          precoReferencia: item.precoReferencia,
-          precoUnidade: item.precoUnidade,
-
-          imagemChave: item.imagemChave,
-
-          status: "disponivel",
-          demonstracao: true,
-
-          criadoPor: atual.uid,
-          criadoEm: serverTimestamp(),
-        });
-      });
-
-      await lote.commit();
-
-      setAviso(
-        `${pendentes.length} alimento(s) de demonstração cadastrado(s).`
-      );
-    } catch (erro) {
-      console.error(
-        "Erro ao inserir exemplos:",
-        erro
-      );
-
-      setAviso(
-        erro.code === "permission-denied"
-          ? "Não foi possível cadastrar exemplos. Verifique a conexão e tente novamente."
-          : "Não foi possível inserir os exemplos."
-      );
-    } finally {
-      setProcessandoExemplos(false);
-    }
-  }
-
-  // ========================================
-  // ATUALIZAR PREÇOS PROMOCIONAIS
-  // ========================================
-
-  async function atualizarPrecos() {
-    if (processandoExemplos) return;
-
-    const atual = auth.currentUser;
-
-    if (!atual) {
-      setAviso("Faça login novamente.");
-      return;
-    }
-
-    setProcessandoExemplos(true);
-    setAviso("");
-
-    try {
-      const verificacoes = await Promise.all(
-        EXEMPLOS.map(async (item) => {
-          const referencia = doc(
-            db,
-            "alimentos",
-            `demo-${item.id}`
-          );
-
-          const documento = await getDoc(referencia);
-          const precoAtual = calcularPrecoPromocional(
-            item.precoReferencia
-          );
-
-          return {
-            item,
-            referencia,
-            precoAtual,
-            dados: documento.exists()
-              ? documento.data()
-              : null,
-          };
-        })
-      );
-
-      const permitidos = verificacoes.filter(
-        ({ item, dados, precoAtual }) =>
-          dados?.demonstracao === true &&
-          dados?.criadoPor === atual.uid &&
-          (
-            dados?.precoAtual !== precoAtual ||
-            dados?.preco !== moeda(precoAtual) ||
-            dados?.precoAntigo !==
-              moeda(item.precoReferencia) ||
-            dados?.precoReferencia !==
-              item.precoReferencia ||
-            dados?.precoUnidade !==
-              item.precoUnidade
-          )
-      );
-
-      if (permitidos.length === 0) {
-        setAviso(
-          "Nenhum preço de demonstração da sua conta precisa ser atualizado."
-        );
-        return;
-      }
-
-      const lote = writeBatch(db);
-
-      permitidos.forEach(({ item, referencia, precoAtual }) => {
-        lote.update(referencia, {
-          preco: moeda(precoAtual),
-          precoAtual,
-          precoAntigo: moeda(item.precoReferencia),
-          precoReferencia: item.precoReferencia,
-          precoUnidade: item.precoUnidade,
-          atualizadoEm: serverTimestamp(),
-        });
-      });
-
-      await lote.commit();
-
-      setAviso(
-        `${permitidos.length} preço(s) promocional(is) atualizado(s).`
-      );
-    } catch (erro) {
-      console.error(
-        "Erro ao atualizar preços:",
-        erro
-      );
-
-      setAviso(
-        erro.code === "permission-denied"
-          ? "Não foi possível atualizar. Tente novamente mais tarde."
-          : "Não foi possível atualizar os preços."
-      );
-    } finally {
-      setProcessandoExemplos(false);
-    }
-  }
-
-  // ========================================
   // PESQUISA
   // ========================================
 
   function abrirBusca() {
-    setAbaAtiva("buscar");
-
     scrollRef.current?.scrollTo({
       y: 0,
       animated: true,
@@ -1330,56 +1027,26 @@ export default function TelaHome({ navigation, route }) {
     buscaRef.current?.focus();
   }
 
-  // ========================================
-  // CADASTRAR NOVA DOAÇÃO
-  // ========================================
+  function voltarAoInicio() {
+    setBusca("");
+    setCategoria("Todas");
 
-  function abrirCadastro() {
-    setModal(null);
-    setAbaAtiva("inicio");
-
-    navigation.navigate("TelaCadastrarDoacao");
+    scrollRef.current?.scrollTo({
+      y: 0,
+      animated: true,
+    });
   }
-
-  // ========================================
-  // MENU INFERIOR
-  // ========================================
-
-  function selecionarAba(id) {
-    if (id === "inicio") {
-      setAbaAtiva("inicio");
-      setBusca("");
-      setCategoria("Todas");
-
-      scrollRef.current?.scrollTo({
-        y: 0,
-        animated: true,
-      });
-    } else if (id === "buscar") {
-      abrirBusca();
-    } else if (id === "doar") {
-      abrirCadastro();
-    } else if (id === "eventos") {
-      setAbaAtiva("eventos");
-      navigation.navigate("TelaEventos");
-    } else if (id === "perfil") {
-      setAbaAtiva("perfil");
-      navigation.navigate("TelaPerfil");
-    } else {
-      setAbaAtiva("inicio");
-    }
-  }
-
-  // ========================================
-  // NOVO: RECEBER COMANDOS DAS OUTRAS TELAS
-  // ========================================
 
   useEffect(() => {
     const abaSolicitada = route?.params?.abrirAba;
 
     if (!abaSolicitada) return;
 
-    selecionarAba(abaSolicitada);
+    if (abaSolicitada === "buscar") {
+      abrirBusca();
+    } else if (abaSolicitada === "inicio") {
+      voltarAoInicio();
+    }
 
     navigation.setParams({
       abrirAba: undefined,
@@ -1424,7 +1091,6 @@ export default function TelaHome({ navigation, route }) {
 
     setModal(null);
     setProdutoSelecionado(null);
-    setAbaAtiva("inicio");
     setErroSair("");
   }
 
@@ -1607,25 +1273,6 @@ export default function TelaHome({ navigation, route }) {
           </View>
 
           {/* ==================================
-              CADASTRAR DOAÇÃO
-          ================================== */}
-
-          <TouchableOpacity
-            style={styles.cadastrarBotao}
-            onPress={abrirCadastro}
-          >
-            <Ionicons
-              name="add-circle-outline"
-              size={20}
-              color={VERDE}
-            />
-
-            <Text style={styles.cadastrarTexto}>
-              Cadastrar alimento para doação
-            </Text>
-          </TouchableOpacity>
-
-          {/* ==================================
               NOVO: MINHAS DOAÇÕES
           ================================== */}
 
@@ -1665,73 +1312,6 @@ export default function TelaHome({ navigation, route }) {
             </Text>
           </TouchableOpacity>
 
-          {/* ==================================
-              INSERIR EXEMPLOS DO TCC
-          ================================== */}
-
-          {!carregando &&
-            !erroLista &&
-            !todosExemplosInseridos && (
-              <View style={styles.painelExemplos}>
-                <Text style={styles.exemploTitulo}>
-          Alimentos do catálogo
-                </Text>
-
-                <Text style={styles.exemploInfo}>
-          Mercearia, enlatados, bebidas e hortifruti.
-          Quantidades e valores são demonstrativos.
-                </Text>
-
-                <TouchableOpacity
-                  onPress={inserirExemplos}
-                  disabled={processandoExemplos}
-                  style={styles.botaoVerde}
-                >
-                  {processandoExemplos ? (
-                    <ActivityIndicator
-                      color="#FFFFFF"
-                    />
-                  ) : (
-                    <Text style={styles.botaoVerdeTexto}>
-                      Adicionar {EXEMPLOS.length} alimentos ao catálogo
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-          {/* ==================================
-              ATUALIZAR PREÇOS
-          ================================== */}
-
-          {!carregando &&
-            !erroLista &&
-            temPrecosParaAtualizar && (
-              <TouchableOpacity
-                style={styles.botaoAtualizar}
-                onPress={atualizarPrecos}
-                disabled={processandoExemplos}
-              >
-                {processandoExemplos ? (
-                  <ActivityIndicator color={VERDE} />
-                ) : (
-                  <Text style={styles.botaoAtualizarTexto}>
-                    Atualizar preços do catálogo
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-
-          {/* ==================================
-              AVISOS E CARREGAMENTO
-          ================================== */}
-
-          {!!aviso && (
-            <Text style={styles.aviso}>
-              {aviso}
-            </Text>
-          )}
-
           {carregando && (
             <ActivityIndicator
               size="large"
@@ -1770,7 +1350,7 @@ export default function TelaHome({ navigation, route }) {
 
                 <Text style={styles.vazioTexto}>
                   {alimentos.length === 0
-                    ? "Cadastre uma doação ou insira os exemplos de demonstração."
+                    ? "Novos alimentos aparecerão aqui quando forem cadastrados."
                     : "Experimente outra busca ou categoria."}
                 </Text>
               </View>
@@ -1880,37 +1460,6 @@ export default function TelaHome({ navigation, route }) {
             })}
         </ScrollView>
 
-        {/* ==================================
-            MENU INFERIOR
-        ================================== */}
-
-        <View style={styles.menuInferior}>
-          {ABAS.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() =>
-                selecionarAba(item.id)
-              }
-              style={styles.itemMenu}
-              accessibilityLabel={item.nome}
-            >
-              <Ionicons
-                name={item.icone}
-                size={23}
-                color="#111111"
-              />
-
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-                style={styles.itemMenuTexto}
-              >
-                {item.id === "inicio" ? "Início" : item.nome}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
 
       {/* ==================================
@@ -2122,7 +1671,7 @@ const styles = StyleSheet.create({
 
   conteudo: {
     paddingTop: 17,
-    paddingBottom: 30,
+    paddingBottom: 92,
   },
 
   // CABEÇALHO
@@ -2130,6 +1679,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingLeft: 52,
   },
 
   saudacao: {
@@ -2261,24 +1811,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 
-  // CADASTRAR DOAÇÃO
-  cadastrarBotao: {
-    minHeight: 42,
-    backgroundColor: "#E9F6E2",
-    borderRadius: 11,
-    flexDirection: "row",
-    gap: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-
-  cadastrarTexto: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: VERDE,
-  },
-
   // NOVO: MINHAS DOAÇÕES
   minhasDoacoesBotao: {
     minHeight: 42,
@@ -2297,29 +1829,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // EXEMPLOS
-  painelExemplos: {
-    backgroundColor: "#FFFFFF",
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "#D1E3C9",
-    borderRadius: 13,
-    marginBottom: 15,
-  },
-
-  exemploTitulo: {
-    color: VERDE,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  exemploInfo: {
-    color: "#696969",
-    fontSize: 12,
-    lineHeight: 18,
-    marginVertical: 9,
-  },
-
   botaoVerde: {
     minHeight: 43,
     backgroundColor: VERDE_BOTAO,
@@ -2335,28 +1844,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
-  },
-
-  botaoAtualizar: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#BBD7B6",
-    borderRadius: 10,
-    marginBottom: 14,
-  },
-
-  botaoAtualizarTexto: {
-    fontSize: 12,
-    color: VERDE,
-    textAlign: "center",
-    fontWeight: "700",
-  },
-
-  aviso: {
-    fontSize: 12,
-    color: VERDE,
-    textAlign: "center",
-    marginBottom: 14,
   },
 
   erro: {
@@ -2489,31 +1976,6 @@ const styles = StyleSheet.create({
 
   verDetalhesTexto: {
     color: "#31523B",
-    fontSize: 12,
-  },
-
-  // MENU INFERIOR
-  menuInferior: {
-    minHeight: 46,
-    flexDirection: "row",
-    alignItems: "stretch",
-    borderWidth: 1,
-    borderColor: "#B7B7B7",
-    backgroundColor: FUNDO,
-    paddingHorizontal: 0,
-  },
-
-  itemMenu: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 44,
-    gap: 1,
-  },
-
-  itemMenuTexto: {
-    fontFamily: "Poppins_400Regular",
-    color: "#111111",
     fontSize: 12,
   },
 

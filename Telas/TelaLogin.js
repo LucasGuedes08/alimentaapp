@@ -17,6 +17,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import Svg, { Path } from "react-native-svg";
+
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
@@ -34,6 +36,48 @@ const VERDE_BOTAO = "#378B20";
 const FUNDO = "#FEFEF8";
 
 // ========================================
+// LOGOTIPO OFICIAL DO GOOGLE
+// ========================================
+
+function LogoGoogle({ size = 22 }) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+    >
+      {/* VERMELHO */}
+
+      <Path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+
+      {/* AZUL */}
+
+      <Path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.27 5.48-4.79 7.18l7.73 6C44.39 38.03 46.98 31.88 46.98 24.55z"
+      />
+
+      {/* AMARELO */}
+
+      <Path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+
+      {/* VERDE */}
+
+      <Path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.88-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.15 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </Svg>
+  );
+}
+
+// ========================================
 // TELA DE LOGIN
 // ========================================
 
@@ -46,11 +90,17 @@ export default function TelaLogin({
   const largura = Math.min(width, 460);
   const compacto = height < 750;
 
+  // ======================================
   // CAMPOS
+  // ======================================
+
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
 
+  // ======================================
   // INTERFACE
+  // ======================================
+
   const [mostrarSenha, setMostrarSenha] =
     useState(false);
 
@@ -80,6 +130,7 @@ export default function TelaLogin({
       setErro(
         "Digite seu e-mail e sua senha."
       );
+
       return;
     }
 
@@ -92,8 +143,8 @@ export default function TelaLogin({
         senha
       );
 
-      // O APP.JS DETECTA O LOGIN
-      // E DIRECIONA PARA A HOME.
+      // O App.js detecta o login
+      // e direciona para a Home.
     } catch (e) {
       console.error(
         "Erro no login:",
@@ -138,6 +189,7 @@ export default function TelaLogin({
       setAviso(
         "O login com Google ainda não está configurado no Android."
       );
+
       return;
     }
 
@@ -193,25 +245,32 @@ export default function TelaLogin({
       <View
         style={[
           styles.painel,
-          { width: largura },
+          {
+            width: largura,
+          },
         ]}
       >
         {/* FUNDO DECORATIVO ORIGINAL */}
+
         <Image
           source={require(
             "../assets/images/tabIcons/fundoCadastro.png"
           )}
           resizeMode="cover"
-          style={[styles.imagemFundo, { pointerEvents: "none" }]}
+          style={styles.imagemFundo}
+          pointerEvents="none"
         />
 
         {/* CONTEÚDO POR CIMA DO FUNDO */}
+
         <SafeAreaView
           style={styles.areaSegura}
           edges={["top", "bottom"]}
         >
           <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+            }}
             behavior={
               Platform.OS === "ios"
                 ? "padding"
@@ -219,12 +278,15 @@ export default function TelaLogin({
             }
           >
             <ScrollView
-              style={{ flex: 1 }}
+              style={{
+                flex: 1,
+              }}
               contentContainerStyle={[
                 styles.rolagem,
                 {
                   paddingTop:
                     compacto ? 20 : 30,
+
                   paddingBottom:
                     compacto ? 20 : 30,
                 },
@@ -233,7 +295,10 @@ export default function TelaLogin({
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.formulario}>
-                {/* VOLTAR */}
+                {/* ==================================
+                    VOLTAR
+                ================================== */}
+
                 <TouchableOpacity
                   style={styles.voltar}
                   onPress={voltar}
@@ -249,7 +314,10 @@ export default function TelaLogin({
                   </Text>
                 </TouchableOpacity>
 
-                {/* LOGO ORIGINAL */}
+                {/* ==================================
+                    LOGO ALIMENTA+
+                ================================== */}
+
                 <Image
                   source={require(
                     "../assets/images/tabIcons/logo.png"
@@ -265,7 +333,10 @@ export default function TelaLogin({
                   accessibilityLabel="Alimenta+"
                 />
 
-                {/* TÍTULO */}
+                {/* ==================================
+                    TÍTULO
+                ================================== */}
+
                 <Text style={styles.titulo}>
                   Bem-vindo de volta!
                 </Text>
@@ -276,7 +347,10 @@ export default function TelaLogin({
                   e fazer a diferença.
                 </Text>
 
-                {/* E-MAIL */}
+                {/* ==================================
+                    E-MAIL
+                ================================== */}
+
                 <Text style={styles.label}>
                   E-mail
                 </Text>
@@ -301,7 +375,10 @@ export default function TelaLogin({
                   />
                 </View>
 
-                {/* SENHA */}
+                {/* ==================================
+                    SENHA
+                ================================== */}
+
                 <Text style={styles.label}>
                   Senha
                 </Text>
@@ -325,7 +402,9 @@ export default function TelaLogin({
 
                   <TouchableOpacity
                     onPress={() =>
-                      setMostrarSenha(!mostrarSenha)
+                      setMostrarSenha(
+                        !mostrarSenha
+                      )
                     }
                     accessibilityLabel={
                       mostrarSenha
@@ -345,12 +424,21 @@ export default function TelaLogin({
                   </TouchableOpacity>
                 </View>
 
-                {/* ESQUECEU A SENHA */}
+                {/* ==================================
+                    RECUPERAR SENHA
+                ================================== */}
+
                 <TouchableOpacity
                   onPress={() =>
-                    navigation.navigate("TelaRecuperarSenha", {
-                      email: email.trim().toLowerCase(),
-                    })
+                    navigation.navigate(
+                      "TelaRecuperarSenha",
+                      {
+                        email:
+                          email
+                            .trim()
+                            .toLowerCase(),
+                      }
+                    )
                   }
                   style={styles.esqueci}
                 >
@@ -359,21 +447,30 @@ export default function TelaLogin({
                   </Text>
                 </TouchableOpacity>
 
-                {/* ERROS */}
+                {/* ==================================
+                    MENSAGENS DE ERRO
+                ================================== */}
+
                 {!!erro && (
                   <Text style={styles.erro}>
                     {erro}
                   </Text>
                 )}
 
-                {/* AVISOS */}
+                {/* ==================================
+                    AVISOS
+                ================================== */}
+
                 {!!aviso && (
                   <Text style={styles.aviso}>
                     {aviso}
                   </Text>
                 )}
 
-                {/* BOTÃO ENTRAR */}
+                {/* ==================================
+                    BOTÃO ENTRAR
+                ================================== */}
+
                 <TouchableOpacity
                   style={styles.botao}
                   onPress={entrar}
@@ -390,18 +487,19 @@ export default function TelaLogin({
                   )}
                 </TouchableOpacity>
 
-                {/* LOGIN COM GOOGLE NA WEB */}
+                {/* ==================================
+                    BOTÃO OFICIAL DO GOOGLE
+                ================================== */}
+
                 {Platform.OS === "web" && (
                   <TouchableOpacity
                     style={styles.google}
                     onPress={entrarGoogle}
                     disabled={ocupado}
+                    accessibilityRole="button"
+                    accessibilityLabel="Entrar com Google"
                   >
-                    <Ionicons
-                      name="logo-google"
-                      size={19}
-                      color="#4285F4"
-                    />
+                    <LogoGoogle size={22} />
 
                     <Text style={styles.googleTexto}>
                       Entrar com Google
@@ -409,7 +507,10 @@ export default function TelaLogin({
                   </TouchableOpacity>
                 )}
 
-                {/* CRIAR CONTA */}
+                {/* ==================================
+                    CRIAR CONTA
+                ================================== */}
+
                 <TouchableOpacity
                   style={styles.link}
                   onPress={() =>
@@ -570,6 +671,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  // ======================================
+  // BOTÃO GOOGLE
+  // ======================================
+
   google: {
     marginTop: 12,
     height: 47,
@@ -580,7 +685,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 9,
+    gap: 10,
   },
 
   googleTexto: {
@@ -618,4 +723,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 11,
   },
-})
+});

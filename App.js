@@ -44,6 +44,7 @@ import {
 
 import { auth } from "./firebase";
 import { ResponsiveProvider } from "./utils/responsive";
+import NavegacaoGlobal from "./components/NavegacaoGlobal";
 
 // ========================================
 // TELAS DOS USUÁRIOS
@@ -55,13 +56,13 @@ import TelaCadastro from "./Telas/TelaCadastro";
 import TelaLogin from "./Telas/TelaLogin";
 import TelaHome from "./Telas/TelaHome";
 
-import TelaCadastrarDoacao from "./Telas/TelaCadastrarDoacao";
 import TelaMinhasDoacoes from "./Telas/TelaMinhasDoacoes";
 import TelaDetalhesDoacao from "./Telas/TelaDetalhesDoacao";
 import TelaDetalhesProduto from "./Telas/TelaDetalhesProduto";
 
 import TelaCarrinhoDoacoes from "./Telas/TelaCarrinhoDoacoes";
 import TelaSeuPedido from "./Telas/TelaSeuPedido";
+import TelaConfirmacaoDoacaoSimulada from "./Telas/TelaConfirmacaoDoacaoSimulada";
 import TelaDetalhesCobranca from "./Telas/TelaDetalhesCobranca";
 
 import TelaPerfil from "./Telas/TelaPerfil";
@@ -484,11 +485,6 @@ export default function App() {
                     />
 
                     <Stack.Screen
-                      name="TelaCadastrarDoacao"
-                      component={TelaCadastrarDoacao}
-                    />
-
-                    <Stack.Screen
                       name="DetalhesCobranca"
                       component={TelaDetalhesCobranca}
                     />
@@ -496,6 +492,11 @@ export default function App() {
                     <Stack.Screen
                       name="TelaSeuPedido"
                       component={TelaSeuPedido}
+                    />
+                    <Stack.Screen
+                      name="TelaConfirmacaoDoacaoSimulada"
+                      component={TelaConfirmacaoDoacaoSimulada}
+                      options={{ headerShown: false }}
                     />
 
                     <Stack.Screen
@@ -614,6 +615,11 @@ export default function App() {
                       name="TelaSeuPedido"
                       component={TelaSeuPedido}
                     />
+                    <Stack.Screen
+                      name="TelaConfirmacaoDoacaoSimulada"
+                      component={TelaConfirmacaoDoacaoSimulada}
+                      options={{ headerShown: false }}
+                    />
 
                     <Stack.Screen name="TelaLoginAdmin">
                       {(props) => (
@@ -627,6 +633,13 @@ export default function App() {
                 )}
               </Stack.Navigator>
             </NavigationContainer>
+
+            {autenticado && !ehAdmin && (
+              <NavegacaoGlobal
+                navigationRef={refNavegacao}
+                rotaAtual={rotaAtual}
+              />
+            )}
 
             {mostrarAreaAdmin && (
               <Pressable

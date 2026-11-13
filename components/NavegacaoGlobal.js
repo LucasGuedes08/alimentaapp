@@ -1,111 +1,81 @@
-import React, {
-  useEffect,
-  useState,
-} from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Animated,
+  Image,
+  Keyboard,
   Modal,
   Pressable,
+  Platform,
   ScrollView,
-  Keyboard,
   StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
 
 const VERDE = "#006838";
 const FUNDO = "#FFFCF6";
 
-const ATALHOS = [
-  {
-    id: "minhas",
-    titulo: "Minhas doações",
-    descricao: "Acompanhe o histórico e o andamento",
-    icone: "gift-outline",
-  },
-  {
-    id: "doar",
-    titulo: "Cadastrar doação",
-    descricao: "Disponibilize alimentos para doação",
-    icone: "add-circle-outline",
-  },
-  {
-    id: "buscar",
-    titulo: "Buscar alimentos",
-    descricao: "Explore o catálogo do Alimenta+",
-    icone: "search-outline",
-  },
-  {
-    id: "eventos",
-    titulo: "Eventos e campanhas",
-    descricao: "Acompanhe as ações do projeto",
-    icone: "calendar-outline",
-  },
-  {
-    id: "conquistas",
-    titulo: "Minhas conquistas",
-    descricao: "Veja o progresso das suas contribuições",
-    icone: "trophy-outline",
-  },
-  {
-    id: "perfil",
-    titulo: "Meu perfil",
-    descricao: "Veja suas informações e sua conta",
-    icone: "person-outline",
-  },
+const ABAS = [
+  { id: "inicio", nome: "Início", icone: "home-outline" },
+  { id: "buscar", nome: "Buscar", icone: "search-outline" },
+  { id: "eventos", nome: "Eventos", icone: "map-outline" },
+  { id: "doar", nome: "Doe Agora", icone: "heart-outline" },
+  { id: "perfil", nome: "Perfil", icone: "person-outline" },
 ];
 
-const ABAS = [
-  {
-    id: "inicio",
-    nome: "Início",
-    icone: "home-outline",
-  },
-  {
-    id: "eventos",
-    nome: "Eventos",
-    icone: "map-outline",
-  },
-  {
-    id: "doar",
-    nome: "Doe Agora",
-    icone: "heart-outline",
-  },
-  {
-    id: "perfil",
-    nome: "Perfil",
-    icone: "person-outline",
-  },
+const OPCOES_MENU = [
+  { id: "inicio", nome: "Início", icone: "home-outline" },
+  { id: "buscar", nome: "Buscar alimentos", icone: "search-outline" },
+  { id: "campanhas", nome: "Campanhas", icone: "heart-outline" },
+  { id: "minhas", nome: "Minhas doações", icone: "gift-outline" },
+  { id: "carrinho", nome: "Carrinho de doações", icone: "cart-outline" },
+  { id: "perfil", nome: "Meu perfil", icone: "person-outline" },
 ];
+
+const ROTAS_SEM_ABA = new Set([
+  "TelaDetalhesProduto",
+  "TelaDetalheCampanha",
+  "TelaCarrinhoDoacoes",
+  "DetalhesCobranca",
+  "TelaSeuPedido",
+  "TelaConfirmacaoDoacaoSimulada",
+]);
 
 export default function NavegacaoGlobal({
   navigationRef,
   rotaAtual,
 }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const progresso = useRef(new Animated.Value(0)).current;
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [modalVisivel, setModalVisivel] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState("inicio");
+  const [tecladoAberto, setTecladoAberto] = useState(false);
+  const [saindo, setSaindo] = useState(false);
+  const [erroSair, setErroSair] = useState("");
 
-  const [menuAberto, setMenuAberto] =
-    useState(false);
+  const larguraMenu = Math.min(width * 0.86, 370);
+  const usuario = auth.currentUser;
+  const nome =
+    usuario?.displayName?.trim() ||
+    usuario?.email?.split("@")[0] ||
+    "Usuário";
 
-  const [abaAtiva, setAbaAtiva] =
-    useState("inicio");
-
-  const [tecladoAberto, setTecladoAberto] =
-    useState(false);
-
-  // OCULTAR MENU INFERIOR COM O TECLADO
   useEffect(() => {
-    const mostrar = Keyboard.addListener(
-      "keyboardDidShow",
-      () => setTecladoAberto(true)
+    const mostrar = Keyboard.addListener("keyboardDidShow", () =>
+      setTecladoAberto(true)
     );
-
-    const ocultar = Keyboard.addListener(
-      "keyboardDidHide",
-      () => setTecladoAberto(false)
+    const ocultar = Keyboard.addListener("keyboardDidHide", () =>
+      setTecladoAberto(false)
     );
 
     return () => {
@@ -114,90 +84,132 @@ export default function NavegacaoGlobal({
     };
   }, []);
 
-  // ROTAS INTERNAS
-  function navegar(destino) {
+  useEffect(() => {
+    if (menuAberto) {
+      setModalVisivel(true);
+    }
+
+    Animated.timing(progresso, {
+      toValue: menuAberto ? 1 : 0,
+      duration: 230,
+      useNativeDriver: Platform.OS !== "web",
+    }).start(({ finished }) => {
+      if (finished && !menuAberto) {
+        setModalVisivel(false);
+      }
+    });
+  }, [menuAberto, progresso]);
+
+  function fecharMenu() {
     setMenuAberto(false);
+  }
+
+  function navegar(destino) {
+    fecharMenu();
+    setErroSair("");
 
     const nav = navigationRef.current;
+    if (!nav?.isReady?.()) return;
 
-    if (!nav?.isReady?.()) {
+    if (destino === "inicio" || destino === "buscar") {
+      setAbaAtiva(destino);
+      nav.navigate("Home", { abrirAba: destino });
       return;
     }
 
     const rotas = {
-      minhas: "TelaMinhasDoacoes",
-      doar: "TelaCadastrarDoacao",
-      eventos: "TelaCampanhas",
-      perfil: "TelaPerfil",
-      conquistas: "TelaConquistas",
+      campanhas: ["TelaCampanhas", "doar"],
+      minhas: ["TelaMinhasDoacoes", "inicio"],
+      carrinho: ["TelaCarrinhoDoacoes", "inicio"],
+      perfil: ["TelaPerfil", "perfil"],
+      eventos: ["TelaEventos", "eventos"],
+      doar: ["TelaCampanhas", "doar"],
     };
+    const destinoConfigurado = rotas[destino];
 
-    if (rotas[destino]) {
-      setAbaAtiva(destino);
-      nav.navigate(rotas[destino]);
-    } else {
-      setAbaAtiva(destino);
-
-      nav.navigate("Home", {
-        abrirAba: destino,
-      });
+    if (destinoConfigurado) {
+      setAbaAtiva(destinoConfigurado[1]);
+      nav.navigate(destinoConfigurado[0]);
     }
   }
 
-  // IDENTIFICAR A ABA ATIVA
+  async function sairDaConta() {
+    if (saindo) return;
+
+    setSaindo(true);
+    setErroSair("");
+
+    try {
+      await signOut(auth);
+      fecharMenu();
+    } catch (erro) {
+      console.error("Erro ao sair da conta pelo menu:", erro);
+      setErroSair("Não foi possível sair da conta. Tente novamente.");
+    } finally {
+      setSaindo(false);
+    }
+  }
+
   const abaSelecionada =
     rotaAtual === "TelaPerfil" ||
     rotaAtual === "TelaEditarPerfil" ||
     rotaAtual === "TelaConquistas"
       ? "perfil"
-      : rotaAtual === "TelaCampanhas"
-      ? "eventos"
-      : rotaAtual === "TelaCadastrarDoacao"
+      : rotaAtual === "TelaCampanhas" ||
+        rotaAtual === "TelaDetalheCampanha"
       ? "doar"
+      : rotaAtual === "TelaEventos"
+      ? "eventos"
+      : rotaAtual === "TelaMinhasDoacoes" ||
+        rotaAtual === "TelaDetalhesDoacao"
+      ? "inicio"
       : rotaAtual === "Home"
       ? abaAtiva
       : "inicio";
 
-  if (
-    rotaAtual === "TelaDetalhesProduto" ||
-    rotaAtual === "TelaConquistas" ||
-    rotaAtual === "DetalhesCobranca" ||
-    rotaAtual === "TelaSeuPedido"
-  ) {
-    return null;
-  }
+  const mostrarAbas =
+    !tecladoAberto && !ROTAS_SEM_ABA.has(rotaAtual);
+
+  const opacidadeFundo = progresso.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const deslocamentoMenu = progresso.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-larguraMenu, 0],
+  });
 
   return (
     <>
-      <View
-        pointerEvents="box-none"
-        style={styles.camada}
-      >
-        {/* ÍCONE DE TRÊS LINHAS */}
-        <Pressable
-          onPress={() => setMenuAberto(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Abrir menu de atalhos"
-          style={[
-            styles.botaoHamburguer,
-            {
-              top: insets.top + 15,
-            },
-          ]}
-        >
-          <View style={styles.barraHamburguer} />
-          <View style={styles.barraHamburguer} />
-          <View style={styles.barraHamburguer} />
-        </Pressable>
+      <View pointerEvents="box-none" style={styles.camada}>
+        {rotaAtual === "Home" && (
+          <Pressable
+            onPress={() => setMenuAberto(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir menu"
+            style={[
+              styles.botaoMenu,
+              {
+                top: insets.top + 13,
+                left: Math.max(18, (width - 460) / 2 + 18),
+              },
+            ]}
+          >
+            <View style={styles.linhaMenu} />
+            <View style={styles.linhaMenu} />
+            <View style={styles.linhaMenu} />
+          </Pressable>
+        )}
 
-        {/* MENU INFERIOR GLOBAL */}
-        {!tecladoAberto && (
+        {mostrarAbas && (
           <View
             style={[
               styles.barraInferior,
               {
+                left: Math.max(0, (width - 460) / 2),
+                right: Math.max(0, (width - 460) / 2),
                 paddingBottom: insets.bottom,
-                minHeight: 46 + insets.bottom,
+                minHeight: 52 + insets.bottom,
               },
             ]}
           >
@@ -207,21 +219,26 @@ export default function NavegacaoGlobal({
                 onPress={() => navegar(aba.id)}
                 accessibilityRole="button"
                 accessibilityLabel={aba.nome}
+                accessibilityState={{
+                  selected: abaSelecionada === aba.id,
+                }}
                 style={styles.aba}
               >
                 <Ionicons
                   name={aba.icone}
                   size={23}
-                  color="#111111"
+                  color={abaSelecionada === aba.id ? VERDE : "#111111"}
                 />
-
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
-                  style={styles.textoAba}
+                  style={[
+                    styles.textoAba,
+                    abaSelecionada === aba.id && styles.textoAbaAtiva,
+                  ]}
                 >
-                  {aba.id === "inicio" ? "Início" : aba.nome}
+                  {aba.nome}
                 </Text>
               </Pressable>
             ))}
@@ -229,98 +246,128 @@ export default function NavegacaoGlobal({
         )}
       </View>
 
-      {/* MODAL LATERAL DE ATALHOS */}
       <Modal
-        visible={menuAberto}
+        visible={modalVisivel}
         transparent
-        animationType="fade"
+        animationType="none"
         statusBarTranslucent
-        onRequestClose={() =>
-          setMenuAberto(false)
-        }
+        onRequestClose={fecharMenu}
       >
         <View style={styles.fundoModal}>
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={() =>
-              setMenuAberto(false)
-            }
-          />
-
-          <View
+          <Animated.View
             style={[
-              styles.painelModal,
+              StyleSheet.absoluteFillObject,
+              styles.sombraModal,
+              { opacity: opacidadeFundo },
+            ]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={fecharMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar menu"
+            />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.painelMenu,
               {
-                paddingTop: insets.top + 15,
+                width: larguraMenu,
+                paddingTop: insets.top + 14,
+                paddingBottom: Math.max(insets.bottom, 16),
+                transform: [{ translateX: deslocamentoMenu }],
               },
             ]}
           >
-            <View style={styles.cabecalho}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.titulo}>
-                  Atalhos
-                </Text>
+            <View style={styles.cabecalhoMenu}>
+              <View style={styles.avatar}>
+                {usuario?.photoURL ? (
+                  <Image
+                    source={{ uri: usuario.photoURL }}
+                    style={styles.fotoPerfil}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={30}
+                    color={VERDE}
+                  />
+                )}
+              </View>
 
-                <Text style={styles.subtitulo}>
-                  Acesse outras áreas do Alimenta+
+              <View style={styles.dadosUsuario}>
+                <Text numberOfLines={1} style={styles.nomeUsuario}>
+                  Olá, {nome}
+                </Text>
+                <Text style={styles.boasVindas}>
+                  Bem-vindo(a) ao Alimenta+
                 </Text>
               </View>
 
               <Pressable
+                onPress={fecharMenu}
                 accessibilityRole="button"
                 accessibilityLabel="Fechar menu"
-                onPress={() =>
-                  setMenuAberto(false)
-                }
-                style={styles.fechar}
+                style={styles.botaoFechar}
               >
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={VERDE}
-                />
+                <Ionicons name="close" size={23} color={VERDE} />
               </Pressable>
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.lista}
+              contentContainerStyle={styles.listaMenu}
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
-              {ATALHOS.map((item) => (
+              {OPCOES_MENU.map((opcao) => (
                 <Pressable
-                  key={item.id}
-                  onPress={() => navegar(item.id)}
-                  style={styles.atalho}
+                  key={opcao.id}
+                  onPress={() => navegar(opcao.id)}
                   accessibilityRole="button"
+                  style={styles.opcaoMenu}
                 >
-                  <View style={styles.iconeAtalho}>
-                    <Ionicons
-                      name={item.icone}
-                      size={24}
-                      color={VERDE}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tituloAtalho}>
-                      {item.titulo}
-                    </Text>
-
-                    <Text style={styles.descricaoAtalho}>
-                      {item.descricao}
-                    </Text>
-                  </View>
-
+                  <Ionicons
+                    name={opcao.icone}
+                    size={22}
+                    color={VERDE}
+                  />
+                  <Text style={styles.textoOpcao}>{opcao.nome}</Text>
                   <Ionicons
                     name="chevron-forward"
-                    size={19}
-                    color="#819283"
+                    size={18}
+                    color="#879487"
                   />
                 </Pressable>
               ))}
+
+              <View style={styles.divisor} />
+
+              <Pressable
+                onPress={sairDaConta}
+                disabled={saindo}
+                accessibilityRole="button"
+                style={styles.opcaoMenu}
+              >
+                {saindo ? (
+                  <ActivityIndicator size="small" color={VERDE} />
+                ) : (
+                  <Ionicons
+                    name="log-out-outline"
+                    size={22}
+                    color={VERDE}
+                  />
+                )}
+                <Text style={styles.textoOpcao}>Sair da conta</Text>
+              </Pressable>
+
+              {!!erroSair && (
+                <Text accessibilityRole="alert" style={styles.erroSair}>
+                  {erroSair}
+                </Text>
+              )}
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </>
@@ -333,29 +380,22 @@ const styles = StyleSheet.create({
     zIndex: 50,
     elevation: 50,
   },
-
-  botaoHamburguer: {
+  botaoMenu: {
     position: "absolute",
-    right: 15,
-    width: 43,
-    height: 43,
-    borderRadius: 12,
-    backgroundColor: FUNDO,
-    borderWidth: 1,
-    borderColor: "#DDE6D8",
+    width: 40,
+    height: 40,
+    borderRadius: 22,
+    backgroundColor: "#E9F2E3",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    elevation: 3,
+    gap: 3,
   },
-
-  barraHamburguer: {
-    width: 22,
-    height: 3,
-    borderRadius: 4,
+  linhaMenu: {
+    width: 19,
+    height: 2.5,
+    borderRadius: 3,
     backgroundColor: VERDE,
   },
-
   barraInferior: {
     position: "absolute",
     left: 0,
@@ -365,106 +405,113 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#B7B7B7",
     flexDirection: "row",
-    minHeight: 46,
   },
-
   aba: {
     flex: 1,
     minWidth: 0,
-    minHeight: 44,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     gap: 1,
   },
-
   textoAba: {
     fontFamily: "Poppins_400Regular",
-    fontSize: 12,
+    fontSize: 11,
     color: "#111111",
   },
-
-  fundoModal: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-
-  painelModal: {
-    width: "86%",
-    maxWidth: 370,
-    backgroundColor: FUNDO,
-    borderTopLeftRadius: 22,
-    borderBottomLeftRadius: 22,
-    paddingHorizontal: 17,
-    paddingBottom: 25,
-    elevation: 12,
-  },
-
-  cabecalho: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 18,
-    gap: 10,
-  },
-
-  titulo: {
-    fontFamily: "Poppins_700Bold",
-    color: VERDE,
-    fontSize: 25,
-  },
-
-  subtitulo: {
-    fontFamily: "Poppins_400Regular",
-    color: "#657364",
-    fontSize: 12,
-    lineHeight: 19,
-  },
-
-  fechar: {
-    width: 34,
-    height: 34,
-    borderRadius: 18,
-    backgroundColor: "#E9F5E5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  lista: {
-    gap: 10,
-    paddingBottom: 25,
-  },
-
-  atalho: {
-    minHeight: 74,
-    padding: 11,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E6E0",
-    borderRadius: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-
-  iconeAtalho: {
-    width: 45,
-    height: 45,
-    borderRadius: 13,
-    backgroundColor: "#E9F5E5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  tituloAtalho: {
-    fontSize: 14,
+  textoAbaAtiva: {
     color: VERDE,
     fontFamily: "Poppins_600SemiBold",
   },
-
-  descricaoAtalho: {
-    fontSize: 11,
-    lineHeight: 17,
-    color: "#6B746B",
+  fundoModal: {
+    flex: 1,
+    flexDirection: "row",
   },
-})
+  sombraModal: {
+    backgroundColor: "rgba(0,0,0,0.34)",
+  },
+  painelMenu: {
+    height: "100%",
+    backgroundColor: FUNDO,
+    paddingHorizontal: 17,
+    elevation: 12,
+  },
+  cabecalhoMenu: {
+    minHeight: 82,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 15,
+    borderRadius: 16,
+    backgroundColor: "#E9F2E3",
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  fotoPerfil: {
+    width: "100%",
+    height: "100%",
+  },
+  dadosUsuario: {
+    flex: 1,
+    minWidth: 0,
+  },
+  nomeUsuario: {
+    fontFamily: "Poppins_700Bold",
+    color: VERDE,
+    fontSize: 15,
+  },
+  boasVindas: {
+    fontFamily: "Poppins_400Regular",
+    color: "#647260",
+    fontSize: 11,
+    marginTop: 1,
+  },
+  botaoFechar: {
+    width: 34,
+    height: 34,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  listaMenu: {
+    paddingBottom: 18,
+    gap: 5,
+  },
+  opcaoMenu: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  textoOpcao: {
+    flex: 1,
+    fontFamily: "Poppins_500Medium",
+    color: "#29352B",
+    fontSize: 13,
+  },
+  divisor: {
+    height: 1,
+    backgroundColor: "#D8E0D4",
+    marginVertical: 10,
+    marginHorizontal: 10,
+  },
+  erroSair: {
+    color: "#B3261E",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 12,
+    marginHorizontal: 12,
+    marginTop: 4,
+  },
+});
